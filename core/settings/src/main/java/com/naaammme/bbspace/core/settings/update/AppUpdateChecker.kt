@@ -56,7 +56,7 @@ class AppUpdateChecker @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AppUpdateChecker"
-        private const val RELEASES_API = "https://api.github.com/repos/naaammme/bbspace/releases/latest"
+        private const val RELEASES_API = "https://api.github.com/repos/Flyoverisblind/new-bbspace/releases/latest"
     }
 
     suspend fun check(): Result<AppUpdateCheckResult> = withContext(Dispatchers.IO) {
