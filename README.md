@@ -4,6 +4,10 @@
 
 <h2 align="center">哔哔空间</h2>
 
+> **说明：本项目基于原 [BBSpace](https://github.com/naaammme/bbspace) 二次修改与维护，原项目作者为 [naaammme](https://github.com/naaammme)。**
+>
+> 当前仓库地址：[Flyoverisblind/new-bbspace](https://github.com/Flyoverisblind/new-bbspace)
+
 <p align="center">
   <a href="https://github.com/naaammme/bbspace/stargazers">
     <img src="https://img.shields.io/github/stars/naaammme/bbspace?style=flat" alt="stars" />
