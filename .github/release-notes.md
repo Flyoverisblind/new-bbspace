@@ -6,6 +6,5 @@
 - 收藏夹支持播放全部
 - 个人空间新增 UP 主直播回放
 - 修复录播 JSON 解析错误
-- 修复「需要4k」设置自动关闭
 
 本项目基于 [BBSpace](https://github.com/naaammme/bbspace) 修改。
