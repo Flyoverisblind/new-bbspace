@@ -167,8 +167,8 @@ fun AppearanceSettingsScreen(
 
             item {
                 SettingSwitch(
-                    title = "视频卡片转场",
-                    subtitle = "从首页视频卡片放大进入播放页，返回时缩回原位置",
+                    title = "Hero 无缝动画",
+                    subtitle = "从首页卡片飞入播放页，返回时原路飞回",
                     checked = config.videoTransitionEnabled,
                     onCheckedChange = viewModel::updateVideoTransitionEnabled
                 )

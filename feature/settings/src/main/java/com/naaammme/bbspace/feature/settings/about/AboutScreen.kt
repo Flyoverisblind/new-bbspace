@@ -178,29 +178,15 @@ fun AboutScreen(
             item {
                 LinkCard(
                     title = "加入 QQ 群",
-                    subtitle = "924787418",
-                    onClick = {
-                        val qqGroupNumber = "924787418"
-                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("QQ群号", qqGroupNumber))
-                        Toast.makeText(context, "已复制QQ群号", Toast.LENGTH_SHORT).show()
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    "mqqapi://card/show_pslcard?src_type=internal&version=1&uin=$qqGroupNumber&card_type=group&source=qrcode".toUri()
-                                )
-                            )
-                        }
-                    }
+                    subtitle = "暂未设置"
                 )
             }
 
             item {
                 LinkCard(
                     title = "加入 Telegram 群组",
-                    subtitle = "t.me/ourbbspace",
-                    url = "https://t.me/ourbbspace"
+                    subtitle = "t.me/newbbspace",
+                    url = "https://t.me/newbbspace"
                 )
             }
 
@@ -209,6 +195,14 @@ fun AboutScreen(
                     title = "GitHub 开源仓库",
                     subtitle = "github.com/naaammme/bbspace",
                     url = "https://github.com/naaammme/bbspace"
+                )
+            }
+
+            item {
+                LinkCard(
+                    title = "我的 GitHub 仓库",
+                    subtitle = "github.com/Flyoverisblind/new-bbspace",
+                    url = "https://github.com/Flyoverisblind/new-bbspace"
                 )
             }
         }
@@ -276,25 +270,18 @@ private fun SupportDevDialog(onDismiss: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.support_tip_code),
-                    contentDescription = "打赏赞赏码",
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = onDismiss,
-                            onLongClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    saveSupportTipCode(context)
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, "已保存到相册", Toast.LENGTH_SHORT)
-                                            .show()
-                                    }
-                                }
-                            }
-                        ),
-                    contentScale = ContentScale.Fit
-                )
+                        .aspectRatio(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "赞赏码暂未设置",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

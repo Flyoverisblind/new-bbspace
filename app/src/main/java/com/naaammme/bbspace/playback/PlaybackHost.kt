@@ -43,6 +43,7 @@ fun PlaybackHost(
     onOpenSpace: (SpaceRoute) -> Unit,
     onOpenDownloadCache: () -> Unit,
     onStartDownload: (VideoDownloadRequest) -> Unit,
+    detailsVisible: Boolean = true,
     videoViewModel: VideoViewModel,
     liveViewModel: LiveViewModel,
     modifier: Modifier = Modifier

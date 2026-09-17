@@ -2,6 +2,12 @@ package com.naaammme.bbspace.feature.video
 
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -73,6 +79,7 @@ fun VideoScreen(
     onOpenSpace: (SpaceRoute) -> Unit,
     onOpenDownloadCache: () -> Unit,
     onStartDownload: (VideoDownloadRequest) -> Unit,
+    detailsVisible: Boolean = true,
     viewModel: VideoViewModel,
     hostExpanded: Boolean = true
 ) {
@@ -213,27 +220,34 @@ fun VideoScreen(
                         onBackClick = handleBack,
                         onGoHome = onGoHome
                     )
-                    VideoDetailPage(
+                    AnimatedVisibility(
+                        visible = detailsVisible,
                         modifier = Modifier.weight(1f),
-                        detail = videoState.detail,
-                        ids = videoState.ids,
-                        detailLoading = videoState.detailLoading,
-                        detailError = videoState.detailError,
-                        actionState = actionState,
-                        onLike = viewModel::likeVideo,
-                        onCoin = { count -> viewModel.coinVideo(count) },
-                        onFavorite = viewModel::favoriteVideo,
-                        onTriple = viewModel::tripleVideo,
-                        playQueue = playQueue,
-                        onOpenQueueItem = viewModel::switchPlayQueueItem,
-                        commentSubject = viewModel.commentSubject,
-                        contentHorizontalPad = 0.dp,
-                        onOpenVideo = openTarget,
-                        onOpenSpace = onOpenSpace,
-                        onDownloadClick = downloadClick,
-                        onOpenEpisode = switchEpisode,
-                        onSwitchPage = switchPage
-                    )
+                        enter = fadeIn(tween(240)) + slideInVertically(tween(280)) { it / 10 },
+                        exit = fadeOut(tween(120)) + slideOutVertically(tween(140)) { it / 12 }
+                    ) {
+                        VideoDetailPage(
+                            modifier = Modifier.fillMaxSize(),
+                            detail = videoState.detail,
+                            ids = videoState.ids,
+                            detailLoading = videoState.detailLoading,
+                            detailError = videoState.detailError,
+                            actionState = actionState,
+                            onLike = viewModel::likeVideo,
+                            onCoin = { count -> viewModel.coinVideo(count) },
+                            onFavorite = viewModel::favoriteVideo,
+                            onTriple = viewModel::tripleVideo,
+                            playQueue = playQueue,
+                            onOpenQueueItem = viewModel::switchPlayQueueItem,
+                            commentSubject = viewModel.commentSubject,
+                            contentHorizontalPad = 0.dp,
+                            onOpenVideo = openTarget,
+                            onOpenSpace = onOpenSpace,
+                            onDownloadClick = downloadClick,
+                            onOpenEpisode = switchEpisode,
+                            onSwitchPage = switchPage
+                        )
+                    }
                 }
             }
 
@@ -258,29 +272,36 @@ fun VideoScreen(
                             onGoHome = onGoHome
                         )
                     }
-                    VideoDetailPage(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(MaterialTheme.colorScheme.background),
-                        detail = videoState.detail,
-                        ids = videoState.ids,
-                        detailLoading = videoState.detailLoading,
-                        detailError = videoState.detailError,
-                        actionState = actionState,
-                        onLike = viewModel::likeVideo,
-                        onCoin = { count -> viewModel.coinVideo(count) },
-                        onFavorite = viewModel::favoriteVideo,
-                        onTriple = viewModel::tripleVideo,
-                        playQueue = playQueue,
-                        onOpenQueueItem = viewModel::switchPlayQueueItem,
-                        commentSubject = viewModel.commentSubject,
-                        contentHorizontalPad = 16.dp,
-                        onOpenVideo = openTarget,
-                        onOpenSpace = onOpenSpace,
-                        onDownloadClick = downloadClick,
-                        onOpenEpisode = switchEpisode,
-                        onSwitchPage = switchPage
-                    )
+                    AnimatedVisibility(
+                        visible = detailsVisible,
+                        modifier = Modifier.weight(1f),
+                        enter = fadeIn(tween(240)) + slideInVertically(tween(280)) { it / 10 },
+                        exit = fadeOut(tween(120)) + slideOutVertically(tween(140)) { it / 12 }
+                    ) {
+                        VideoDetailPage(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background),
+                            detail = videoState.detail,
+                            ids = videoState.ids,
+                            detailLoading = videoState.detailLoading,
+                            detailError = videoState.detailError,
+                            actionState = actionState,
+                            onLike = viewModel::likeVideo,
+                            onCoin = { count -> viewModel.coinVideo(count) },
+                            onFavorite = viewModel::favoriteVideo,
+                            onTriple = viewModel::tripleVideo,
+                            playQueue = playQueue,
+                            onOpenQueueItem = viewModel::switchPlayQueueItem,
+                            commentSubject = viewModel.commentSubject,
+                            contentHorizontalPad = 16.dp,
+                            onOpenVideo = openTarget,
+                            onOpenSpace = onOpenSpace,
+                            onDownloadClick = downloadClick,
+                            onOpenEpisode = switchEpisode,
+                            onSwitchPage = switchPage
+                        )
+                    }
                 }
             }
         }

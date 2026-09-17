@@ -1,11 +1,15 @@
 package com.naaammme.bbspace.playback
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +19,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -72,11 +77,15 @@ fun VideoTransitionOverlay(
             .graphicsLayer { this.alpha = alpha.value }
     ) {
         val density = LocalDensity.current
+        val statusTopPx = with(density) {
+            WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx()
+        }
+        val playerHeight = constraints.maxWidth * 9f / 16f
         val target = Rect(
             left = 0f,
             top = 0f,
             right = constraints.maxWidth.toFloat(),
-            bottom = constraints.maxHeight.toFloat()
+            bottom = statusTopPx + playerHeight
         )
         val sourceBounds = Rect(
             left = state.source.bounds.left,
@@ -84,8 +93,8 @@ fun VideoTransitionOverlay(
             right = state.source.bounds.right,
             bottom = state.source.bounds.bottom
         )
-        val current = lerpRect(sourceBounds, target, progress.value)
-        val radiusPx = with(density) { startRadiusDp.coerceAtLeast(0).dp.toPx() } * (1f - progress.value)
+        val current = heroFlightRect(sourceBounds, target, progress.value)
+        val radiusPx = with(density) { startRadiusDp.coerceAtLeast(0).dp.toPx() } * (1f - progress.value).let { it * it * (3f - 2f * it) }
         Box(
             modifier = Modifier
                 .offset {
@@ -102,10 +111,16 @@ fun VideoTransitionOverlay(
                 .background(Color.Black)
         ) {
             state.source.cover?.takeIf(String::isNotBlank)?.let { cover ->
+                val motionBlurDp = (
+                    kotlin.math.sin(Math.PI * progress.value).toFloat() *
+                        (6f * (1f - kotlin.math.abs(progress.value - 0.5f) * 2f))
+                    ).coerceAtLeast(0f)
                 BiliAsyncImage(
                     url = cover,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(motionBlurDp.dp),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -113,12 +128,19 @@ fun VideoTransitionOverlay(
     }
 }
 
-private fun lerpRect(start: Rect, end: Rect, fraction: Float): Rect {
+private fun heroFlightRect(start: Rect, end: Rect, fraction: Float): Rect {
+    val width = lerp(start.width, end.width, fraction)
+    val height = lerp(start.height, end.height, fraction)
+    val dx = end.center.x - start.center.x
+    val dy = end.center.y - start.center.y
+    val arc = kotlin.math.sin(Math.PI * fraction).toFloat() * 0.07f
+    val centerX = lerp(start.center.x, end.center.x, fraction) - dy * arc
+    val centerY = lerp(start.center.y, end.center.y, fraction) + dx * arc
     return Rect(
-        left = lerp(start.left, end.left, fraction),
-        top = lerp(start.top, end.top, fraction),
-        right = lerp(start.right, end.right, fraction),
-        bottom = lerp(start.bottom, end.bottom, fraction)
+        left = centerX - width / 2f,
+        top = centerY - height / 2f,
+        right = centerX + width / 2f,
+        bottom = centerY + height / 2f
     )
 }
 

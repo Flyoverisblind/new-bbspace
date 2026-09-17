@@ -160,6 +160,21 @@ fun AppNavHost(
     var forcedDismissMode by remember { mutableStateOf<PlaybackHostMode?>(null) }
     var videoTransition by remember { mutableStateOf<VideoTransitionState?>(null) }
     var videoTransitionSource by remember { mutableStateOf<VideoTransitionSource?>(null) }
+    var videoDetailsVisible by remember { mutableStateOf(true) }
+    var videoHostSuppressed by remember { mutableStateOf(false) }
+    val videoTransitionDurationMs = (320f * themeConfig.animationSpeed.multiplier)
+        .roundToInt()
+        .coerceAtLeast(1)
+    val videoHostAlpha by animateFloatAsState(
+        targetValue = if (videoHostSuppressed || videoTransition?.phase == VideoTransitionPhase.Closing) 0f else 1f,
+        animationSpec = tween(durationMillis = 160),
+        label = "video host alpha"
+    )
+    LaunchedEffect(hostMode) {
+        if (hostMode != PlaybackHostMode.Expanded) {
+            videoHostSuppressed = false
+        }
+    }
     val playbackMode = when {
         hostMode != PlaybackHostMode.Expanded -> hostMode
         forcedDismissMode != null -> forcedDismissMode!!
@@ -196,6 +211,7 @@ fun AppNavHost(
             hostMode == PlaybackHostMode.Expanded &&
             videoTransition?.phase != VideoTransitionPhase.Closing
         ) {
+            videoHostSuppressed = true
             videoTransition = VideoTransitionState(source, VideoTransitionPhase.Closing)
         } else {
             performDismissPlaybackHost()
@@ -236,10 +252,13 @@ fun AppNavHost(
             null
         }
         VideoTransitionCoordinator.source = null
+        videoHostSuppressed = false
         if (source != null) {
+            videoDetailsVisible = false
             videoTransitionSource = source
             videoTransition = VideoTransitionState(source, VideoTransitionPhase.Opening)
         } else {
+            videoDetailsVisible = true
             videoTransition = null
             videoTransitionSource = null
         }
@@ -344,6 +363,7 @@ fun AppNavHost(
                     glassAlpha = themeConfig.glassAlpha,
                     glassBorderAlpha = themeConfig.glassBorderAlpha,
                     glassNoise = themeConfig.glassNoise,
+                    videoTransitionRadiusDp = themeConfig.videoTransitionRadiusDp,
                     onNavigateToSpace = rootNavController::navigateToSpace,
                     onNavigateToLive = openLive,
                     onNavigateToArticle = openArticle,
@@ -535,6 +555,11 @@ fun AppNavHost(
             )
         }
 
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = videoHostAlpha }
+        ) {
         PlaybackHost(
             mode = playbackMode,
             playbackHostViewModel = playbackHostViewModel,
@@ -554,9 +579,11 @@ fun AppNavHost(
             onOpenSpace = openSpaceFromVideo,
             onOpenDownloadCache = openDownloadFromVideo,
             onStartDownload = downloadViewModel::enqueueDownload,
+            detailsVisible = videoDetailsVisible,
             videoViewModel = videoViewModel,
             liveViewModel = liveViewModel
         )
+        }
 
         if (themeConfig.videoTransitionEnabled) {
             VideoTransitionOverlay(
@@ -572,11 +599,13 @@ fun AppNavHost(
                 },
                 onFaded = {
                     videoTransition = null
+                    videoDetailsVisible = true
                 },
                 onClosed = {
+                    performDismissPlaybackHost()
                     videoTransition = null
                     videoTransitionSource = null
-                    performDismissPlaybackHost()
+                    videoDetailsVisible = true
                 }
             )
         }
@@ -598,6 +627,7 @@ private fun MainTabsScaffold(
     glassAlpha: Float,
     glassBorderAlpha: Float,
     glassNoise: Float,
+    videoTransitionRadiusDp: Int,
     onNavigateToSpace: (SpaceRoute) -> Unit,
     onNavigateToLive: (LiveRoute) -> Unit,
     onNavigateToArticle: (String, Int) -> Unit,
@@ -632,6 +662,7 @@ private fun MainTabsScaffold(
                             onNavigateToProfile = { onTabChange(TopLevelRoute.PROFILE) },
                             profileAvatar = userState.user?.avatar,
                             onOpenVideo = onNavigateToVideo,
+                            videoTransitionRadiusDp = videoTransitionRadiusDp,
                             onOpenSpace = onNavigateToSpace,
                             onOpenLive = onNavigateToLive,
                             onOpenDynamic = onNavigateToDynamicDetail,

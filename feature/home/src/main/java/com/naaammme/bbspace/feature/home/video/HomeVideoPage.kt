@@ -67,6 +67,7 @@ fun HomeVideoPage(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenVideo: (VideoTarget) -> Unit,
+    videoTransitionRadiusDp: Int = 20,
     onOpenSpace: (SpaceRoute) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
     onOpenDynamic: (String) -> Unit,
@@ -106,6 +107,7 @@ fun HomeVideoPage(
     ) { item ->
         FeedCard(
             item = item,
+            cardRadiusDp = videoTransitionRadiusDp,
             onOpenSpace = onOpenSpace,
             dislikedReason = dislikedReasons[item.actionKey()],
             onDislike = onDislike,
@@ -125,6 +127,7 @@ fun HomeVideoPage(
 @Composable
 private fun FeedCard(
     item: FeedItem,
+    cardRadiusDp: Int,
     onOpenSpace: (SpaceRoute) -> Unit,
     dislikedReason: String?,
     onDislike: (FeedItem, ThreePointReason) -> Unit,
@@ -134,11 +137,11 @@ private fun FeedCard(
     val isDisliked = dislikedReason != null
     val isDynamic = item.cardGoto == "dynamic"
     val canOpen = !isDisliked && (item.target != null || item.liveRoute != null || isDynamic)
-    var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var coverBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Card(
         onClick = {
             val target = item.target
-            val bounds = cardBounds
+            val bounds = coverBounds
             if (target != null && bounds != null) {
                 VideoTransitionCoordinator.source = VideoTransitionSource(
                     target = target,
@@ -154,24 +157,7 @@ private fun FeedCard(
             onClick()
         },
         enabled = canOpen,
-        modifier = Modifier
-            .fillMaxWidth()
-            .onGloballyPositioned { coordinates ->
-                val bounds = coordinates.boundsInRoot()
-                cardBounds = bounds
-                val currentTarget = item.target
-                val currentSource = VideoTransitionCoordinator.source
-                if (currentTarget != null && currentSource != null && currentSource.target.isSameEntry(currentTarget)) {
-                    VideoTransitionCoordinator.source = currentSource.copy(
-                        bounds = VideoTransitionBounds(
-                            left = bounds.left,
-                            top = bounds.top,
-                            right = bounds.right,
-                            bottom = bounds.bottom
-                        )
-                    )
-                }
-            }
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column {
             CoverImage(
@@ -181,6 +167,26 @@ private fun FeedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 10f)
+                    .onGloballyPositioned { coordinates ->
+                        val bounds = coordinates.boundsInRoot()
+                        coverBounds = bounds
+                        val currentTarget = item.target
+                        val currentSource = VideoTransitionCoordinator.source
+                        if (
+                            currentTarget != null &&
+                            currentSource != null &&
+                            currentSource.target.isSameEntry(currentTarget)
+                        ) {
+                            VideoTransitionCoordinator.source = currentSource.copy(
+                                bounds = VideoTransitionBounds(
+                                    left = bounds.left,
+                                    top = bounds.top,
+                                    right = bounds.right,
+                                    bottom = bounds.bottom
+                                )
+                            )
+                        }
+                    }
             ) {
                 if (dislikedReason != null) {
                     DislikedOverlay(
