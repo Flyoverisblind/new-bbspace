@@ -33,7 +33,10 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -96,6 +99,8 @@ import com.naaammme.bbspace.feature.listen.navigation.navigateToListenDetail
 import com.naaammme.bbspace.feature.live.LiveViewModel
 import com.naaammme.bbspace.feature.search.navigation.navigateToSearch
 import com.naaammme.bbspace.feature.search.navigation.searchScreen
+import com.naaammme.bbspace.feature.space.navigation.liveRecordPlayerScreen
+import com.naaammme.bbspace.feature.space.navigation.navigateToLiveRecordPlayer
 import com.naaammme.bbspace.feature.space.navigation.navigateToSpace
 import com.naaammme.bbspace.feature.space.navigation.spaceScreen
 import com.naaammme.bbspace.feature.space.navigation.spaceRelationScreen
@@ -189,7 +194,10 @@ fun AppNavHost(
     val openVideoPlaylist: (List<VideoTarget>) -> Unit = { targets ->
         if (targets.isNotEmpty()) {
             playbackHostViewModel.expand()
-            videoViewModel.openPlaylist(targets)
+            videoViewModel.openPlaylist(
+                title = "收藏夹",
+                targets = targets
+            )
         }
     }
     val openLive: (LiveRoute) -> Unit = { route ->
@@ -366,10 +374,18 @@ fun AppNavHost(
                 },
                 onOpenLive = openLive,
                 onOpenLiveRecord = { item ->
-                    rootNavController.navigateToWebView(
-                        "https://live.bilibili.com/p/html/live-app-playback/index.html" +
-                                "?replay_id=${item.recordId}&live_uid=${item.uid}#new"
-                    )
+                    val playUrl = item.playUrl
+                    if (!playUrl.isNullOrBlank()) {
+                        rootNavController.navigateToLiveRecordPlayer(
+                            url = playUrl,
+                            title = item.title
+                        )
+                    } else {
+                        rootNavController.navigateToWebView(
+                            "https://live.bilibili.com/p/html/live-app-playback/index.html" +
+                                    "?replay_id=${item.recordId}&live_uid=${item.uid}#new"
+                        )
+                    }
                 },
                 onOpenIm = { mid, name, avatar ->
                     rootNavController.navigateToImConversation(
@@ -389,6 +405,9 @@ fun AppNavHost(
             spaceRelationScreen(
                 onBack = { rootNavController.popBackStack() },
                 onOpenSpace = rootNavController::navigateToSpace
+            )
+            liveRecordPlayerScreen(
+                onBack = { rootNavController.popBackStack() }
             )
             webViewScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -596,12 +615,21 @@ private fun TopLevelFloatingNavigation(
         modifier = animatedModifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            shape = toolbarShape,
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ) {
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), content = { tabs() })
+        Box {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(toolbarShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.76f))
+                    .blur(20.dp)
+            )
+            Surface(
+                shape = toolbarShape,
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), content = { tabs() })
+            }
         }
         Spacer(modifier = Modifier.width(topLevelNavGap))
         searchFab()

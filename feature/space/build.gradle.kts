@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:live"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
+    implementation(project(":infra:player"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

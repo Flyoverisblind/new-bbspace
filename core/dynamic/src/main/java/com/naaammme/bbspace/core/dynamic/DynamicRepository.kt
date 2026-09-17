@@ -345,11 +345,15 @@ class DynamicRepository @Inject constructor(
     private fun mapDescText(desc: ModuleDesc): String? {
         val text = desc.text.blankToNull()
         if (text != null) return text
-        return desc.descList.joinToString("") { it.text }.blankToNull()
+        return desc.descList.joinToString("") { node ->
+            node.text.ifBlank { node.origText }
+        }.blankToNull()
     }
 
     private fun mapExtendDesc(item: DynamicItem): String? {
-        return item.extend.descList.joinToString("") { it.text }.blankToNull()
+        return item.extend.descList.joinToString("") { node ->
+            node.text.ifBlank { node.origText }
+        }.blankToNull()
     }
 
     private fun mapOpusSummaryTitle(summary: ModuleOpusSummary): String? {

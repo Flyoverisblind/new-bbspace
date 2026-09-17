@@ -56,6 +56,7 @@ import com.naaammme.bbspace.core.model.PlayerSettingsState
 import com.naaammme.bbspace.core.model.ResolvedVideoIds
 import com.naaammme.bbspace.core.model.VideoPlaybackState
 import com.naaammme.bbspace.core.model.VideoCdnMode
+import com.naaammme.bbspace.feature.video.VideoPlayQueue
 import com.naaammme.bbspace.feature.video.VideoViewModel
 import com.naaammme.bbspace.feature.video.formatDuration
 import com.naaammme.bbspace.feature.video.formatSpeed
@@ -162,6 +163,74 @@ internal fun VideoPlaybackSidebar(
                         .navigationBarsPadding()
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VideoQueueSheet(
+    queue: VideoPlayQueue,
+    viewModel: VideoViewModel,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = 16.dp,
+                vertical = 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item(key = "queue_title") {
+                Text(
+                    text = queue.title,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+            items(
+                items = queue.items,
+                key = { "queue_${it.hashCode()}" }
+            ) { item ->
+                val index = queue.items.indexOf(item)
+                val selected = index == queue.currentIndex
+                val title = when (item) {
+                    is com.naaammme.bbspace.core.model.VideoTarget.Ugc -> "AV${item.aid} / CID ${item.cid}"
+                    is com.naaammme.bbspace.core.model.VideoTarget.Pgc -> item.epId.takeIf { it > 0L }?.let { "EP$it" } ?: "选集"
+                    is com.naaammme.bbspace.core.model.VideoTarget.Pugv -> item.epId.takeIf { it > 0L }?.let { "EP$it" } ?: "选集"
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !selected) {
+                            viewModel.switchPlayQueueItem(index)
+                            onDismiss()
+                        }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${index + 1}. $title",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (selected) {
+                        Text(
+                            text = "当前播放",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
         }
     }

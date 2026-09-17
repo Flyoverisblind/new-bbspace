@@ -3,6 +3,8 @@ package com.naaammme.bbspace.feature.video.player
 import android.media.AudioManager
 import android.os.BatteryManager
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,10 +115,13 @@ internal fun VideoPlayerPane(
     val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
     val state by viewModel.videoState.collectAsStateWithLifecycle()
     val player by viewModel.player.collectAsStateWithLifecycle()
+    val playQueue by viewModel.playQueueState.collectAsStateWithLifecycle()
+    val onlineCount by viewModel.onlineCount.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     var activeDialog by remember { mutableStateOf<PlayerDialog?>(null) }
     var showPlaybackSheet by remember { mutableStateOf(false) }
     var showCollectionSheet by remember { mutableStateOf(false) }
+    var showQueueSheet by remember { mutableStateOf(false) }
     var showCtrl by remember { mutableStateOf(false) }
     val videoResizeMode = rememberSaveable { mutableStateOf(PlayerVideoResizeMode.Fit) }
     val topMetaText = remember(showCtrl, isFull) {
@@ -160,6 +166,16 @@ internal fun VideoPlayerPane(
         }
     }
     var lastWarmAspect by remember(playerView) { mutableStateOf<Float?>(null) }
+    val seamlessScale by animateFloatAsState(
+        targetValue = if (isFull) 1f else 0.985f,
+        animationSpec = tween(durationMillis = 260),
+        label = "seamless player scale"
+    )
+    val seamlessAlpha by animateFloatAsState(
+        targetValue = if (isFull) 1f else 0.97f,
+        animationSpec = tween(durationMillis = 260),
+        label = "seamless player alpha"
+    )
 
     LaunchedEffect(state.playWhenReady) {
         playerView.keepScreenOn = state.playWhenReady
@@ -187,6 +203,11 @@ internal fun VideoPlayerPane(
     CompositionLocalProvider(LocalVideoResizeModeState provides videoResizeMode) {
         Box(
             modifier = modifier
+                .graphicsLayer {
+                    scaleX = seamlessScale
+                    scaleY = seamlessScale
+                    alpha = seamlessAlpha
+                }
                 .background(Color.Black)
         ) {
             AndroidView(
@@ -305,6 +326,27 @@ internal fun VideoPlayerPane(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (onlineCount > 0L) {
+                            Text(
+                                text = "${onlineCount}人一起看",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
+                            )
+                        }
+                        playQueue?.let {
+                            Text(
+                                text = it.title,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .clickable {
+                                        showCtrl = true
+                                        showQueueSheet = true
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            )
+                        }
                         state.detail?.season?.let {
                             Text(
                                 text = "合集",
@@ -315,7 +357,7 @@ internal fun VideoPlayerPane(
                                         showCtrl = true
                                         showCollectionSheet = true
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
                             )
                         }
                         Text(
@@ -414,6 +456,14 @@ internal fun VideoPlayerPane(
                 state = state,
                 viewModel = viewModel,
                 onDismiss = { showCollectionSheet = false }
+            )
+        }
+
+        if (showQueueSheet && playQueue != null) {
+            VideoQueueSheet(
+                queue = playQueue!!,
+                viewModel = viewModel,
+                onDismiss = { showQueueSheet = false }
             )
         }
     }

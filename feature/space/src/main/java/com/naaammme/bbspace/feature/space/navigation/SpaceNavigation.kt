@@ -12,6 +12,7 @@ import com.naaammme.bbspace.core.model.SpaceRoute
 import com.naaammme.bbspace.core.model.SpaceRouteTool
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.feature.space.SpaceScreen
+import com.naaammme.bbspace.feature.space.record.LiveRecordPlayerScreen
 
 const val SPACE_MID_ARG = "mid"
 const val SPACE_NAME_ARG = "name"
@@ -71,6 +72,33 @@ fun NavGraphBuilder.spaceScreen(
             onOpenLiveRecord = onOpenLiveRecord,
             onOpenIm = onOpenIm,
             onOpenRelation = onOpenRelation
+        )
+    }
+}
+
+private const val LIVE_RECORD_URL_ARG = "url"
+private const val LIVE_RECORD_TITLE_ARG = "title"
+
+fun NavController.navigateToLiveRecordPlayer(url: String, title: String?) {
+    navigate(
+        "live_record_player?$LIVE_RECORD_URL_ARG=${Uri.encode(url)}" +
+                "&$LIVE_RECORD_TITLE_ARG=${Uri.encode(title.orEmpty())}"
+    )
+}
+
+fun NavGraphBuilder.liveRecordPlayerScreen(onBack: () -> Unit) {
+    composable(
+        route = "live_record_player?$LIVE_RECORD_URL_ARG={$LIVE_RECORD_URL_ARG}" +
+                "&$LIVE_RECORD_TITLE_ARG={$LIVE_RECORD_TITLE_ARG}",
+        arguments = listOf(
+            navArgument(LIVE_RECORD_URL_ARG) { type = NavType.StringType; defaultValue = "" },
+            navArgument(LIVE_RECORD_TITLE_ARG) { type = NavType.StringType; defaultValue = "" }
+        )
+    ) { entry ->
+        LiveRecordPlayerScreen(
+            title = entry.arguments?.getString(LIVE_RECORD_TITLE_ARG),
+            url = entry.arguments?.getString(LIVE_RECORD_URL_ARG).orEmpty(),
+            onBack = onBack
         )
     }
 }

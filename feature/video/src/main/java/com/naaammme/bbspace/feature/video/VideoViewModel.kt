@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.naaammme.bbspace.core.settings.AppSettings
+import com.naaammme.bbspace.core.playback.VideoOnlineRepository
 import com.naaammme.bbspace.core.playback.VideoPlaybackController
 import com.naaammme.bbspace.core.model.CommentSubject
 import com.naaammme.bbspace.core.model.CommentSubjectTool
@@ -29,10 +30,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+data class VideoPlayQueue(
+    val title: String,
+    val items: List<VideoTarget>,
+    val currentIndex: Int
+)
+
 @HiltViewModel
 class VideoViewModel @Inject constructor(
     private val playbackController: VideoPlaybackController,
-    private val playerSettings: AppSettings
+    private val playerSettings: AppSettings,
+    private val onlineRepository: VideoOnlineRepository
 ) : ViewModel() {
 
     private val _targetStack = MutableStateFlow<List<VideoTarget>>(emptyList())
@@ -40,6 +48,12 @@ class VideoViewModel @Inject constructor(
     private var playQueueIndex = -1
     private var playbackPrefs = PlayerPlaybackPrefs()
     private var endedHandled = false
+    private val _playQueueState = MutableStateFlow<VideoPlayQueue?>(null)
+    private val _onlineCount = MutableStateFlow(0L)
+    private var onlineKey: Pair<Long, Long>? = null
+
+    val playQueueState: StateFlow<VideoPlayQueue?> = _playQueueState
+    val onlineCount: StateFlow<Long> = _onlineCount
 
     val player: StateFlow<Player?> = playbackController.player
     val videoState: StateFlow<VideoPlaybackState> = playbackController.videoState
@@ -49,6 +63,25 @@ class VideoViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             playerSettings.state.collect { playbackPrefs = it.playback }
+        }
+        viewModelScope.launch {
+            videoState.collect { state ->
+                val ids = state.ids
+                val key = ids.aid to ids.cid
+                if (ids.aid > 0L && ids.cid > 0L && key != onlineKey) {
+                    onlineKey = key
+                    runCatching {
+                        onlineRepository.fetchOnlineTotal(
+                            aid = ids.aid,
+                            cid = ids.cid,
+                            bvid = ids.bvid
+                        )
+                    }.onSuccess { _onlineCount.value = it }
+                } else if (ids.aid <= 0L || ids.cid <= 0L) {
+                    onlineKey = null
+                    _onlineCount.value = 0L
+                }
+            }
         }
         viewModelScope.launch {
             videoState.collect { state ->
@@ -82,13 +115,22 @@ class VideoViewModel @Inject constructor(
         playbackController.openVideo(target)
     }
 
-    fun openPlaylist(targets: List<VideoTarget>, startIndex: Int = 0) {
+    fun openPlaylist(
+        title: String,
+        targets: List<VideoTarget>,
+        startIndex: Int = 0
+    ) {
         if (targets.isEmpty()) return
         val index = startIndex.coerceIn(0, targets.lastIndex)
         val target = targets[index]
         _targetStack.value = listOf(target)
         playQueue = targets
         playQueueIndex = index
+        _playQueueState.value = VideoPlayQueue(
+            title = title,
+            items = targets,
+            currentIndex = index
+        )
         playbackController.openVideo(target)
     }
 
@@ -229,9 +271,21 @@ class VideoViewModel @Inject constructor(
         playbackController.openVideo(target)
     }
 
+    fun switchPlayQueueItem(index: Int) {
+        val queue = _playQueueState.value ?: return
+        if (index !in queue.items.indices) return
+        val target = queue.items[index]
+        playQueue = queue.items
+        playQueueIndex = index
+        _playQueueState.value = queue.copy(currentIndex = index)
+        _targetStack.value = listOf(target)
+        playbackController.openVideo(target)
+    }
+
     private fun clearPlayQueue() {
         playQueue = emptyList()
         playQueueIndex = -1
+        _playQueueState.value = null
     }
 
     private fun updatePlayQueue(
@@ -244,12 +298,16 @@ class VideoViewModel @Inject constructor(
         }
         playQueue = queue
         playQueueIndex = queue.indexOfFirst { it.matches(current) }
+        _playQueueState.value = null
     }
 
     private fun syncPlayQueuePosition(target: VideoTarget) {
         if (playQueue.size <= 1) return
         val index = playQueue.indexOfFirst { it.matches(target) }
-        if (index >= 0) playQueueIndex = index
+        if (index >= 0) {
+            playQueueIndex = index
+            _playQueueState.value = _playQueueState.value?.copy(currentIndex = index)
+        }
     }
 
     private fun syncPlayQueueFromDetail() {
@@ -322,6 +380,7 @@ class VideoViewModel @Inject constructor(
         if (nextIndex !in playQueue.indices) return false
         playQueueIndex = nextIndex
         val next = playQueue[nextIndex]
+        _playQueueState.value = _playQueueState.value?.copy(currentIndex = nextIndex)
         _targetStack.value = _targetStack.value.dropLast(1) + next
         playbackController.openVideo(next)
         return true
