@@ -16,6 +16,12 @@ data class ThemeConfig(
     val pullRefreshDistanceDp: Float = DEFAULT_PULL_REFRESH_DISTANCE_DP,
     val animationSpeed: AnimationSpeed = AnimationSpeed.NORMAL,
     val transitionStyle: TransitionStyle = TransitionStyle.SHARED_AXIS_Z,
+    val videoTransitionEnabled: Boolean = true,
+    val videoTransitionRadiusDp: Int = 20,
+    val glassBlurDp: Int = 36,
+    val glassAlpha: Float = 0.50f,
+    val glassBorderAlpha: Float = 0.80f,
+    val glassNoise: Float = 0.06f,
     val isPureBlack: Boolean = false,
     val preferredFrameRate: FrameRateMode = FrameRateMode.AUTO,
     val cornerStyle: CornerStyle = CornerStyle.STANDARD

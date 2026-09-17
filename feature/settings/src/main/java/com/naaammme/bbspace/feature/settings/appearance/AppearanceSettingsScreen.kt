@@ -164,6 +164,35 @@ fun AppearanceSettingsScreen(
                     onSelect = viewModel::updateTransitionStyle
                 )
             }
+
+            item {
+                SettingSwitch(
+                    title = "视频卡片转场",
+                    subtitle = "从首页视频卡片放大进入播放页，返回时缩回原位置",
+                    checked = config.videoTransitionEnabled,
+                    onCheckedChange = viewModel::updateVideoTransitionEnabled
+                )
+            }
+
+            item {
+                VideoTransitionRadiusSelector(
+                    radiusDp = config.videoTransitionRadiusDp,
+                    onSelect = viewModel::updateVideoTransitionRadius
+                )
+            }
+
+            item {
+                LiquidGlassSettings(
+                    blurDp = config.glassBlurDp,
+                    alpha = config.glassAlpha,
+                    borderAlpha = config.glassBorderAlpha,
+                    noise = config.glassNoise,
+                    onBlurChange = viewModel::updateGlassBlur,
+                    onAlphaChange = viewModel::updateGlassAlpha,
+                    onBorderAlphaChange = viewModel::updateGlassBorderAlpha,
+                    onNoiseChange = viewModel::updateGlassNoise
+                )
+            }
         }
     }
 }
@@ -502,6 +531,100 @@ private fun PullRefreshDistanceSelector(
                 Text("短", style = MaterialTheme.typography.bodySmall)
                 Text("标准", style = MaterialTheme.typography.bodySmall)
                 Text("长", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiquidGlassSettings(
+    blurDp: Int,
+    alpha: Float,
+    borderAlpha: Float,
+    noise: Float,
+    onBlurChange: (Int) -> Unit,
+    onAlphaChange: (Float) -> Unit,
+    onBorderAlphaChange: (Float) -> Unit,
+    onNoiseChange: (Float) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("液态玻璃", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "调节底部导航栏和搜索按钮的玻璃质感",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            var blur by remember(blurDp) { mutableFloatStateOf(blurDp.toFloat()) }
+            Text("模糊 ${blur.roundToInt()}dp")
+            Slider(
+                value = blur,
+                onValueChange = { blur = it },
+                valueRange = 0f..120f,
+                onValueChangeFinished = { onBlurChange(blur.roundToInt()) }
+            )
+
+            var alphaValue by remember(alpha) { mutableFloatStateOf(alpha) }
+            Text("透明度 ${(alphaValue * 100).roundToInt()}%")
+            Slider(
+                value = alphaValue,
+                onValueChange = { alphaValue = it },
+                valueRange = 0f..1f,
+                onValueChangeFinished = { onAlphaChange(alphaValue) }
+            )
+
+            var border by remember(borderAlpha) { mutableFloatStateOf(borderAlpha) }
+            Text("高光 ${(border * 100).roundToInt()}%")
+            Slider(
+                value = border,
+                onValueChange = { border = it },
+                valueRange = 0f..1f,
+                onValueChangeFinished = { onBorderAlphaChange(border) }
+            )
+
+            var noiseValue by remember(noise) { mutableFloatStateOf(noise) }
+            Text("玻璃颗粒 ${(noiseValue * 100).roundToInt()}%")
+            Slider(
+                value = noiseValue,
+                onValueChange = { noiseValue = it },
+                valueRange = 0f..0.5f,
+                onValueChangeFinished = { onNoiseChange(noiseValue) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoTransitionRadiusSelector(
+    radiusDp: Int,
+    onSelect: (Int) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("卡片圆角", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "转场开始和结束时的圆角大小，当前 ${radiusDp}dp",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(8, 12, 16, 20, 24, 32).forEach { radius ->
+                    FilterChip(
+                        selected = radiusDp == radius,
+                        onClick = { onSelect(radius) },
+                        label = { Text("${radius}dp") }
+                    )
+                }
             }
         }
     }

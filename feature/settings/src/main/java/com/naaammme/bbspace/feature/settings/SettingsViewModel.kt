@@ -183,6 +183,42 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun updateVideoTransitionEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettings.updateVideoTransitionEnabled(enabled)
+        }
+    }
+
+    fun updateVideoTransitionRadius(radiusDp: Int) {
+        viewModelScope.launch {
+            appSettings.updateVideoTransitionRadius(radiusDp)
+        }
+    }
+
+    fun updateGlassBlur(blurDp: Int) {
+        viewModelScope.launch {
+            appSettings.updateGlassBlur(blurDp)
+        }
+    }
+
+    fun updateGlassAlpha(alpha: Float) {
+        viewModelScope.launch {
+            appSettings.updateGlassAlpha(alpha)
+        }
+    }
+
+    fun updateGlassBorderAlpha(alpha: Float) {
+        viewModelScope.launch {
+            appSettings.updateGlassBorderAlpha(alpha)
+        }
+    }
+
+    fun updateGlassNoise(noise: Float) {
+        viewModelScope.launch {
+            appSettings.updateGlassNoise(noise)
+        }
+    }
+
     fun updateIsPureBlack(isPure: Boolean) {
         viewModelScope.launch {
             appSettings.updateIsPureBlack(isPure)

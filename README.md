@@ -13,6 +13,10 @@
 - 收藏夹视频播放全部
 - UP 主直播回放
 - 修复录播接口 JSON 解析错误
+- 视频卡片 → 全屏播放页共享元素转场，关闭反向缩回原位置
+- 转场圆角、开关、速度可调
+- 底部导航栏 / 搜索按钮液态玻璃背板模糊
+- 液态玻璃模糊、透明度、高光、颗粒可调
 
 ## 构建
 
@@ -29,6 +33,7 @@
 - [BBSpace](https://github.com/naaammme/bbspace)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
 - [PiliPlus](https://github.com/bggRGjQaUbCoE/PiliPlus)
+- [Haze](https://github.com/chrisbanes/haze)
 - [androidx/media](https://github.com/androidx/media)
 - [DanmakuFlameMaster](https://github.com/naaammme/DanmakuFlameMaster)
 

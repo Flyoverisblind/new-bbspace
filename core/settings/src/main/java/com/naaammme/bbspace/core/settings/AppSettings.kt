@@ -51,6 +51,12 @@ class AppSettings @Inject constructor(
     private val pullRefreshDistanceKey = floatPreferencesKey("pull_refresh_distance")
     private val animationSpeedKey = stringPreferencesKey("animation_speed")
     private val transitionStyleKey = stringPreferencesKey("transition_style")
+    private val videoTransitionEnabledKey = booleanPreferencesKey("video_transition_enabled")
+    private val videoTransitionRadiusKey = intPreferencesKey("video_transition_radius")
+    private val glassBlurKey = intPreferencesKey("glass_blur")
+    private val glassAlphaKey = floatPreferencesKey("glass_alpha")
+    private val glassBorderAlphaKey = floatPreferencesKey("glass_border_alpha")
+    private val glassNoiseKey = floatPreferencesKey("glass_noise")
     private val isPureBlackKey = booleanPreferencesKey("is_pure_black")
     private val frameRateModeKey = stringPreferencesKey("frame_rate_mode")
     private val cornerStyleKey = stringPreferencesKey("corner_style")
@@ -82,6 +88,17 @@ class AppSettings @Inject constructor(
                 ?: defaultThemeConfig.animationSpeed,
             transitionStyle = prefs[transitionStyleKey]?.let { TransitionStyle.valueOf(it) }
                 ?: defaultThemeConfig.transitionStyle,
+            videoTransitionEnabled = prefs[videoTransitionEnabledKey]
+                ?: defaultThemeConfig.videoTransitionEnabled,
+            videoTransitionRadiusDp = (
+                prefs[videoTransitionRadiusKey] ?: defaultThemeConfig.videoTransitionRadiusDp
+            ).coerceIn(0, 48),
+            glassBlurDp = (prefs[glassBlurKey] ?: defaultThemeConfig.glassBlurDp).coerceIn(0, 120),
+            glassAlpha = (prefs[glassAlphaKey] ?: defaultThemeConfig.glassAlpha).coerceIn(0f, 1f),
+            glassBorderAlpha = (
+                prefs[glassBorderAlphaKey] ?: defaultThemeConfig.glassBorderAlpha
+            ).coerceIn(0f, 1f),
+            glassNoise = (prefs[glassNoiseKey] ?: defaultThemeConfig.glassNoise).coerceIn(0f, 0.5f),
             isPureBlack = prefs[isPureBlackKey] ?: defaultThemeConfig.isPureBlack,
             preferredFrameRate = prefs[frameRateModeKey]?.let { FrameRateMode.valueOf(it) }
                 ?: defaultThemeConfig.preferredFrameRate,
@@ -132,6 +149,30 @@ class AppSettings @Inject constructor(
 
     suspend fun updateTransitionStyle(style: TransitionStyle) {
         context.appSettingsDataStore.edit { it[transitionStyleKey] = style.name }
+    }
+
+    suspend fun updateVideoTransitionEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[videoTransitionEnabledKey] = enabled }
+    }
+
+    suspend fun updateVideoTransitionRadius(radiusDp: Int) {
+        context.appSettingsDataStore.edit { it[videoTransitionRadiusKey] = radiusDp.coerceIn(0, 48) }
+    }
+
+    suspend fun updateGlassBlur(blurDp: Int) {
+        context.appSettingsDataStore.edit { it[glassBlurKey] = blurDp.coerceIn(0, 120) }
+    }
+
+    suspend fun updateGlassAlpha(alpha: Float) {
+        context.appSettingsDataStore.edit { it[glassAlphaKey] = alpha.coerceIn(0f, 1f) }
+    }
+
+    suspend fun updateGlassBorderAlpha(alpha: Float) {
+        context.appSettingsDataStore.edit { it[glassBorderAlphaKey] = alpha.coerceIn(0f, 1f) }
+    }
+
+    suspend fun updateGlassNoise(noise: Float) {
+        context.appSettingsDataStore.edit { it[glassNoiseKey] = noise.coerceIn(0f, 0.5f) }
     }
 
     suspend fun updateIsPureBlack(isPure: Boolean) {

@@ -56,6 +56,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.naaammme.bbspace.core.designsystem.component.roundScreenSafePadding
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.naaammme.bbspace.core.designsystem.theme.ThemeConfig
 import com.naaammme.bbspace.core.designsystem.theme.buildNavTransitions
 import com.naaammme.bbspace.core.model.FavoriteContentTarget
@@ -67,6 +73,9 @@ import com.naaammme.bbspace.core.model.StreamPlaybackTarget
 import androidx.compose.runtime.CompositionLocalProvider
 import com.naaammme.bbspace.core.model.VideoSrc
 import com.naaammme.bbspace.core.model.VideoQueueItem
+import com.naaammme.bbspace.core.model.VideoTransitionCoordinator
+import com.naaammme.bbspace.core.model.VideoTransitionSource
+import com.naaammme.bbspace.core.model.isSameEntry
 import com.naaammme.bbspace.core.model.VideoTarget
 
 import com.naaammme.bbspace.core.model.VideoTargetTool
@@ -121,6 +130,10 @@ import com.naaammme.bbspace.feature.video.VideoViewModel
 import com.naaammme.bbspace.feature.webview.navigation.navigateToWebView
 import com.naaammme.bbspace.feature.webview.navigation.webViewScreen
 import com.naaammme.bbspace.playback.PlaybackHost
+import com.naaammme.bbspace.playback.VideoTransitionOverlay
+import com.naaammme.bbspace.playback.VideoTransitionPhase
+import com.naaammme.bbspace.playback.VideoTransitionState
+import kotlin.math.roundToInt
 import com.naaammme.bbspace.playback.PlaybackHostMode
 import com.naaammme.bbspace.playback.PlaybackHostViewModel
 
@@ -143,16 +156,29 @@ fun AppNavHost(
     val videoViewModel: VideoViewModel = hiltViewModel()
     val liveViewModel: LiveViewModel = hiltViewModel()
     val hostMode = playbackHostViewModel.hostMode
+    val videoPlaybackState by videoViewModel.videoState.collectAsStateWithLifecycle()
     var forcedDismissMode by remember { mutableStateOf<PlaybackHostMode?>(null) }
+    var videoTransition by remember { mutableStateOf<VideoTransitionState?>(null) }
+    var videoTransitionSource by remember { mutableStateOf<VideoTransitionSource?>(null) }
     val playbackMode = when {
         hostMode != PlaybackHostMode.Expanded -> hostMode
         forcedDismissMode != null -> forcedDismissMode!!
         else -> hostMode
     }
+    LaunchedEffect(videoPlaybackState.hasRenderedFirstFrame, videoTransition?.phase) {
+        if (
+            videoPlaybackState.hasRenderedFirstFrame &&
+            videoTransition != null &&
+            videoTransition?.phase != VideoTransitionPhase.Closing &&
+            videoTransition?.fadeOut != true
+        ) {
+            videoTransition = videoTransition?.copy(fadeOut = true)
+        }
+    }
     val closeVideoHost: () -> Unit = {
         playbackHostViewModel.close()
     }
-    val dismissPlaybackHost: () -> Unit = {
+    val performDismissPlaybackHost: () -> Unit = {
         if (playbackHostViewModel.miniPlayerAvailable.value) {
             playbackHostViewModel.minimize()
         } else {
@@ -160,6 +186,19 @@ fun AppNavHost(
                 is StreamPlaybackTarget.Video -> closeVideoHost()
                 is StreamPlaybackTarget.Live, null -> playbackHostViewModel.close()
             }
+        }
+    }
+    val dismissPlaybackHost: () -> Unit = {
+        val source = videoTransitionSource
+        if (
+            themeConfig.videoTransitionEnabled &&
+            source != null &&
+            hostMode == PlaybackHostMode.Expanded &&
+            videoTransition?.phase != VideoTransitionPhase.Closing
+        ) {
+            videoTransition = VideoTransitionState(source, VideoTransitionPhase.Closing)
+        } else {
+            performDismissPlaybackHost()
         }
     }
     val collapseExpandedPlayback = {
@@ -191,6 +230,19 @@ fun AppNavHost(
         currentTab = TopLevelRoute.HOME
     }
     val openVideo: (VideoTarget) -> Unit = { target ->
+        val source = if (themeConfig.videoTransitionEnabled) {
+            VideoTransitionCoordinator.source?.takeIf { it.target.isSameEntry(target) }
+        } else {
+            null
+        }
+        VideoTransitionCoordinator.source = null
+        if (source != null) {
+            videoTransitionSource = source
+            videoTransition = VideoTransitionState(source, VideoTransitionPhase.Opening)
+        } else {
+            videoTransition = null
+            videoTransitionSource = null
+        }
         playbackHostViewModel.expand()
         videoViewModel.openRoot(target)
     }
@@ -288,6 +340,10 @@ fun AppNavHost(
                     },
                     onNavigateToDownload = { rootNavController.navigateToDownload() },
                     onNavigateToVideo = openVideo,
+                    glassBlurDp = themeConfig.glassBlurDp,
+                    glassAlpha = themeConfig.glassAlpha,
+                    glassBorderAlpha = themeConfig.glassBorderAlpha,
+                    glassNoise = themeConfig.glassNoise,
                     onNavigateToSpace = rootNavController::navigateToSpace,
                     onNavigateToLive = openLive,
                     onNavigateToArticle = openArticle,
@@ -501,6 +557,29 @@ fun AppNavHost(
             videoViewModel = videoViewModel,
             liveViewModel = liveViewModel
         )
+
+        if (themeConfig.videoTransitionEnabled) {
+            VideoTransitionOverlay(
+                state = videoTransition,
+                durationMs = (320f * themeConfig.animationSpeed.multiplier)
+                    .roundToInt()
+                    .coerceAtLeast(1),
+                startRadiusDp = themeConfig.videoTransitionRadiusDp,
+                onOpened = {
+                    if (videoTransition?.phase == VideoTransitionPhase.Opening) {
+                        videoTransition = videoTransition?.copy(phase = VideoTransitionPhase.Open)
+                    }
+                },
+                onFaded = {
+                    videoTransition = null
+                },
+                onClosed = {
+                    videoTransition = null
+                    videoTransitionSource = null
+                    performDismissPlaybackHost()
+                }
+            )
+        }
     }
 }
 
@@ -515,6 +594,10 @@ private fun MainTabsScaffold(
     onNavigateFromUser: (UserDest) -> Unit,
     onNavigateToDownload: () -> Unit,
     onNavigateToVideo: (VideoTarget) -> Unit,
+    glassBlurDp: Int,
+    glassAlpha: Float,
+    glassBorderAlpha: Float,
+    glassNoise: Float,
     onNavigateToSpace: (SpaceRoute) -> Unit,
     onNavigateToLive: (LiveRoute) -> Unit,
     onNavigateToArticle: (String, Int) -> Unit,
@@ -531,6 +614,7 @@ private fun MainTabsScaffold(
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val fixBottomBar by settingsViewModel.fixBottomBar.collectAsStateWithLifecycle()
     val navVisibilityController = rememberTopLevelNavVisibilityController(fixBottomBar)
+    val hazeState = rememberHazeState()
 
     Box(
         modifier = Modifier
@@ -538,6 +622,7 @@ private fun MainTabsScaffold(
             .background(MaterialTheme.colorScheme.background)
             .nestedScroll(navVisibilityController.connection)
     ) {
+        Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
         TopLevelRoute.entries.forEach { tab ->
             if (currentTab == tab) {
                 saveableStateHolder.SaveableStateProvider(tab.route) {
@@ -576,6 +661,7 @@ private fun MainTabsScaffold(
             }
         }
 
+        }
         TopLevelFloatingNavigation(
             modifier = Modifier
                 .align(
@@ -588,6 +674,11 @@ private fun MainTabsScaffold(
                 .zIndex(1f),
             currentTab = currentTab,
             visibilityController = navVisibilityController,
+            glassBlurDp = glassBlurDp,
+            glassAlpha = glassAlpha,
+            glassBorderAlpha = glassBorderAlpha,
+            glassNoise = glassNoise,
+            hazeState = hazeState,
             onTabChange = onTabChange,
             onNavigateToSearch = onNavigateToSearch
         )
@@ -599,6 +690,11 @@ private fun TopLevelFloatingNavigation(
     modifier: Modifier = Modifier,
     currentTab: TopLevelRoute,
     visibilityController: TopLevelNavVisibilityController,
+    glassBlurDp: Int,
+    glassAlpha: Float,
+    glassBorderAlpha: Float,
+    glassNoise: Float,
+    hazeState: HazeState,
     onTabChange: (TopLevelRoute) -> Unit,
     onNavigateToSearch: () -> Unit
 ) {
@@ -632,11 +728,24 @@ private fun TopLevelFloatingNavigation(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(CircleShape)
+                    .hazeEffect(
+                        state = hazeState,
+                        style = HazeStyle(
+                            backgroundColor = Color.Transparent,
+                            tint = HazeTint(Color.White.copy(alpha = glassAlpha)),
+                            blurRadius = (glassBlurDp + 4).dp,
+                            noiseFactor = glassNoise,
+                            fallbackTint = HazeTint(
+                                Color.White.copy(alpha = glassAlpha * 0.9f)
+                            )
+                        )
+                    )
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.60f),
-                                Color.White.copy(alpha = 0.20f)
+                                Color.White.copy(alpha = glassAlpha + 0.10f),
+                                Color.White.copy(alpha = glassAlpha * 0.30f),
+                                Color.White.copy(alpha = glassAlpha * 0.08f)
                             )
                         )
                     )
@@ -644,13 +753,12 @@ private fun TopLevelFloatingNavigation(
                         width = 0.8.dp,
                         brush = Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.78f),
-                                Color.White.copy(alpha = 0.18f)
+                                Color.White.copy(alpha = glassBorderAlpha),
+                                Color.White.copy(alpha = glassBorderAlpha * 0.25f)
                             )
                         ),
                         shape = CircleShape
                     )
-                    .blur(22.dp)
             )
             FloatingActionButton(
                 onClick = onNavigateToSearch,
@@ -676,11 +784,24 @@ private fun TopLevelFloatingNavigation(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(toolbarShape)
+                    .hazeEffect(
+                        state = hazeState,
+                        style = HazeStyle(
+                            backgroundColor = Color.Transparent,
+                            tint = HazeTint(Color.White.copy(alpha = glassAlpha)),
+                            blurRadius = glassBlurDp.dp,
+                            noiseFactor = glassNoise,
+                            fallbackTint = HazeTint(
+                                Color.White.copy(alpha = glassAlpha * 0.9f)
+                            )
+                        )
+                    )
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.18f)
+                                Color.White.copy(alpha = glassAlpha + 0.06f),
+                                Color.White.copy(alpha = glassAlpha * 0.28f),
+                                Color.White.copy(alpha = glassAlpha * 0.08f)
                             )
                         )
                     )
@@ -688,13 +809,12 @@ private fun TopLevelFloatingNavigation(
                         width = 0.8.dp,
                         brush = Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.70f),
-                                Color.White.copy(alpha = 0.14f)
+                                Color.White.copy(alpha = glassBorderAlpha),
+                                Color.White.copy(alpha = glassBorderAlpha * 0.22f)
                             )
                         ),
                         shape = toolbarShape
                     )
-                    .blur(32.dp)
             )
             Surface(
                 shape = toolbarShape,

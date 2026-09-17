@@ -142,6 +142,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    implementation(libs.haze)
     implementation(libs.coil.network.okhttp)
     implementation(libs.media3.session)
 

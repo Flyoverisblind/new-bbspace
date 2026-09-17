@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,10 @@ import com.naaammme.bbspace.core.model.SpaceRoute
 import com.naaammme.bbspace.core.model.ThreePointItem
 import com.naaammme.bbspace.core.model.ThreePointReason
 import com.naaammme.bbspace.core.model.VideoTarget
+import com.naaammme.bbspace.core.model.VideoTransitionBounds
+import com.naaammme.bbspace.core.model.VideoTransitionCoordinator
+import com.naaammme.bbspace.core.model.VideoTransitionSource
+import com.naaammme.bbspace.core.model.isSameEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,10 +134,44 @@ private fun FeedCard(
     val isDisliked = dislikedReason != null
     val isDynamic = item.cardGoto == "dynamic"
     val canOpen = !isDisliked && (item.target != null || item.liveRoute != null || isDynamic)
+    var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Card(
-        onClick = onClick,
+        onClick = {
+            val target = item.target
+            val bounds = cardBounds
+            if (target != null && bounds != null) {
+                VideoTransitionCoordinator.source = VideoTransitionSource(
+                    target = target,
+                    bounds = VideoTransitionBounds(
+                        left = bounds.left,
+                        top = bounds.top,
+                        right = bounds.right,
+                        bottom = bounds.bottom
+                    ),
+                    cover = item.cover
+                )
+            }
+            onClick()
+        },
         enabled = canOpen,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                val bounds = coordinates.boundsInRoot()
+                cardBounds = bounds
+                val currentTarget = item.target
+                val currentSource = VideoTransitionCoordinator.source
+                if (currentTarget != null && currentSource != null && currentSource.target.isSameEntry(currentTarget)) {
+                    VideoTransitionCoordinator.source = currentSource.copy(
+                        bounds = VideoTransitionBounds(
+                            left = bounds.left,
+                            top = bounds.top,
+                            right = bounds.right,
+                            bottom = bounds.bottom
+                        )
+                    )
+                }
+            }
     ) {
         Column {
             CoverImage(
