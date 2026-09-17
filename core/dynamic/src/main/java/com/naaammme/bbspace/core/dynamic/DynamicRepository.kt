@@ -2,6 +2,8 @@ package com.naaammme.bbspace.core.dynamic
 
 import com.bapis.bilibili.app.dynamic.v2.AdParam
 import com.bapis.bilibili.app.dynamic.v2.Config
+import com.bapis.bilibili.app.dynamic.v2.Description
+import com.bapis.bilibili.app.dynamic.v2.TextNode
 import com.bapis.bilibili.app.dynamic.v2.DynAllReply
 import com.bapis.bilibili.app.dynamic.v2.DynAllReq
 import com.bapis.bilibili.app.dynamic.v2.DynSpaceReq
@@ -49,6 +51,11 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+
+private const val EMOJI_IMAGE_PREFIX = "￼"
+private const val EMOJI_IMAGE_SUFFIX = "￼"
+private const val EMOJI_DESC_TYPE = 9
+private const val EMOJI_TEXT_NODE_TYPE = 2
 
 @Singleton
 class DynamicRepository @Inject constructor(
@@ -344,34 +351,46 @@ class DynamicRepository @Inject constructor(
 
     private fun mapDescText(desc: ModuleDesc): String? {
         val text = desc.text.blankToNull()
-        if (text != null) return text
-        return desc.descList.joinToString("") { node ->
-            node.text.ifBlank { node.origText }
-        }.blankToNull()
+        if (text != null && desc.descList.none { it.typeValue == EMOJI_DESC_TYPE }) return text
+        return desc.descList.joinToString("") { node -> descriptionNodeText(node) }.blankToNull()
     }
 
     private fun mapExtendDesc(item: DynamicItem): String? {
-        return item.extend.descList.joinToString("") { node ->
-            node.text.ifBlank { node.origText }
-        }.blankToNull()
+        return item.extend.descList.joinToString("") { node -> descriptionNodeText(node) }.blankToNull()
+    }
+
+    private fun descriptionNodeText(node: Description): String {
+        val url = node.iconUrl.ifBlank { node.uri }
+        if (node.typeValue == EMOJI_DESC_TYPE && url.isNotBlank()) {
+            return "$EMOJI_IMAGE_PREFIX$url$EMOJI_IMAGE_SUFFIX"
+        }
+        return node.text.ifBlank { node.origText }
+    }
+
+    private fun textNodeText(node: TextNode): String {
+        val url = node.emote.emoteUrl
+        return if (node.nodeTypeValue == EMOJI_TEXT_NODE_TYPE && url.isNotBlank()) {
+            "$EMOJI_IMAGE_PREFIX$url$EMOJI_IMAGE_SUFFIX"
+        } else {
+            node.rawText
+        }
     }
 
     private fun mapOpusSummaryTitle(summary: ModuleOpusSummary): String? {
-        return summary.title.text.nodesList.joinToString("") { it.rawText }.blankToNull()
+        return summary.title.text.nodesList.joinToString("") { textNodeText(it) }.blankToNull()
     }
 
     private fun mapOpusSummaryText(summary: ModuleOpusSummary): String? {
         val title = mapOpusSummaryTitle(summary)
-        val text = summary.summary.text.nodesList.joinToString("") { it.rawText }.blankToNull()
+        val text = summary.summary.text.nodesList.joinToString("") { textNodeText(it) }.blankToNull()
         return listOfNotNull(title, text).joinToString("\n").blankToNull()
     }
-
     private fun mapPrimaryText(item: DynamicItem): String? {
         return item.modulesList.firstNotNullOfOrNull { module ->
             when {
                 module.hasModuleDesc() -> mapDescText(module.moduleDesc)
                 module.hasModuleParagraph() -> module.moduleParagraph.paragraph.text.nodesList
-                    .joinToString("") { it.rawText }
+                    .joinToString("") { textNodeText(it) }
                     .blankToNull()
                 module.hasModuleOpusSummary() -> mapOpusSummaryText(module.moduleOpusSummary)
                 else -> null

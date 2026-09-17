@@ -191,12 +191,13 @@ fun AppNavHost(
         playbackHostViewModel.expand()
         videoViewModel.openRoot(target)
     }
-    val openVideoPlaylist: (List<VideoTarget>) -> Unit = { targets ->
+    val openVideoPlaylist: (List<VideoTarget>, Int) -> Unit = { targets, startIndex ->
         if (targets.isNotEmpty()) {
             playbackHostViewModel.expand()
             videoViewModel.openPlaylist(
                 title = "收藏夹",
-                targets = targets
+                targets = targets,
+                startIndex = startIndex
             )
         }
     }
@@ -361,7 +362,8 @@ fun AppNavHost(
                 onOpenFolder = { fid ->
                     rootNavController.navigateToFavoriteFolder(fid)
                 },
-                onPlayAll = openVideoPlaylist
+                onPlayAll = { videos -> openVideoPlaylist(videos, 0) },
+                onOpenVideoWithQueue = openVideoPlaylist
             )
             composable(HOME_INTEREST_ROUTE) {
                 InterestScreen(onBack = { rootNavController.popBackStack() })

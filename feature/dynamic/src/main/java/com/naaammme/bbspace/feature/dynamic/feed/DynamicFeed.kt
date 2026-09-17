@@ -3,6 +3,8 @@ package com.naaammme.bbspace.feature.dynamic.feed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,11 +25,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.naaammme.bbspace.core.designsystem.component.AvatarImage
+import com.naaammme.bbspace.core.designsystem.component.BiliAsyncImage
 import com.naaammme.bbspace.core.designsystem.component.CoverImage
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.designsystem.component.UpListRow
@@ -401,18 +405,74 @@ private fun DynamicImageRow(images: List<DynamicImage>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DynamicText(text: String) {
     if (text.isBlank()) return
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 8,
-        overflow = TextOverflow.Ellipsis
-    )
+    val segments = remember(text) { parseDynamicTextSegments(text) }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        segments.forEach { segment ->
+            when (segment) {
+                is DynamicTextSegment.Emoji -> {
+                    BiliAsyncImage(
+                        url = segment.url,
+                        contentDescription = "表情",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                is DynamicTextSegment.Text -> {
+                    Text(
+                        text = segment.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 8,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
 }
 
+private fun parseDynamicTextSegments(text: String): List<DynamicTextSegment> {
+    val result = mutableListOf<DynamicTextSegment>()
+    val buf = StringBuilder()
+    var index = 0
+    while (index < text.length) {
+        if (text[index] == EMOJI_IMAGE_PREFIX) {
+            val end = text.indexOf(EMOJI_IMAGE_PREFIX, startIndex = index + 1)
+            if (end > index) {
+                val url = text.substring(index + 1, end)
+                if (url.isNotBlank()) {
+                    if (buf.isNotEmpty()) {
+                        result += DynamicTextSegment.Text(buf.toString())
+                        buf.clear()
+                    }
+                    result += DynamicTextSegment.Emoji(url)
+                    index = end + 1
+                    continue
+                }
+            }
+        }
+        buf.append(text[index])
+        index++
+    }
+    if (buf.isNotEmpty()) {
+        result += DynamicTextSegment.Text(buf.toString())
+    }
+    return result
+}
+
+private sealed interface DynamicTextSegment {
+    data class Text(val text: String) : DynamicTextSegment
+    data class Emoji(val url: String) : DynamicTextSegment
+}
+
+private const val EMOJI_IMAGE_PREFIX = '￼' 
 private fun DynamicImage.displayAspectRatio(): Float {
     return if (width > 0 && height > 0) {
         (width.toFloat() / height.toFloat()).coerceIn(0.72f, 1.5f)

@@ -31,6 +31,7 @@ fun FavoriteFolderDetailScreen(
     fid: Long,
     onOpenContent: (FavoriteContentTarget) -> Unit,
     onPlayAll: (List<VideoTarget>) -> Unit = {},
+    onOpenVideoWithQueue: (List<VideoTarget>, Int) -> Unit = { _, _ -> },
     viewModel: FavoriteFolderDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,7 +113,19 @@ fun FavoriteFolderDetailScreen(
                         canLoadMore = state.canLoadMore,
                         onLoadMore = viewModel::loadMore,
                         onRetry = if (state.errorOnLoadMore) viewModel::loadMore else viewModel::refresh,
-                        onOpenContent = onOpenContent,
+                        onOpenContent = { target ->
+                            when (target) {
+                                is FavoriteContentTarget.Video -> {
+                                    val index = playableVideos.indexOfFirst { it == target.target }
+                                    if (index >= 0) {
+                                        onOpenVideoWithQueue(playableVideos, index)
+                                    } else {
+                                        onOpenContent(target)
+                                    }
+                                }
+                                is FavoriteContentTarget.DynamicDetail -> onOpenContent(target)
+                            }
+                        },
                         listState = listState
                     )
                 }

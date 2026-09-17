@@ -25,7 +25,8 @@ fun NavGraphBuilder.favoriteScreen(
     onBack: () -> Unit,
     onOpenContent: (FavoriteContentTarget) -> Unit,
     onOpenFolder: (Long) -> Unit,
-    onPlayAll: (List<VideoTarget>) -> Unit = {}
+    onPlayAll: (List<VideoTarget>) -> Unit = {},
+    onOpenVideoWithQueue: (List<VideoTarget>, Int) -> Unit = { _, _ -> }
 ) {
     composable(FAVORITE_ROUTE) {
         FavoriteScreen(
@@ -44,7 +45,8 @@ fun NavGraphBuilder.favoriteScreen(
             onBack = onBack,
             fid = entry.arguments?.getLong(FAVORITE_FOLDER_FID_ARG) ?: 0L,
             onOpenContent = onOpenContent,
-            onPlayAll = onPlayAll
+            onPlayAll = onPlayAll,
+            onOpenVideoWithQueue = onOpenVideoWithQueue
         )
     }
 }
