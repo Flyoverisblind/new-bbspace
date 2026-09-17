@@ -3,6 +3,7 @@ package com.naaammme.bbspace.core.playback
 import com.naaammme.bbspace.core.auth.AuthStore
 import com.naaammme.bbspace.core.common.BiliConstants
 import com.naaammme.bbspace.core.favorite.FavoriteRepository
+import com.naaammme.bbspace.infra.network.BiliApiException
 import com.naaammme.bbspace.infra.network.BiliRestClient
 import com.naaammme.bbspace.infra.network.BiliRestParamBuilder
 import com.naaammme.bbspace.infra.network.BiliRestProfile
@@ -30,42 +31,54 @@ class VideoActionRepository @Inject constructor(
 ) {
     suspend fun like(aid: Long, liked: Boolean): Boolean {
         requireLogin()
-        val json = restClient.postSigned(
-            url = "${BiliConstants.BASE_URL_APP}/x/v2/view/like",
-            params = commonParams() + mapOf(
-                "aid" to aid.toString(),
-                "like" to if (liked) "0" else "1"
+        return try {
+            val json = restClient.postSigned(
+                url = "${BiliConstants.BASE_URL_APP}/x/v2/view/like",
+                params = commonParams() + mapOf(
+                    "aid" to aid.toString(),
+                    "like" to if (liked) "1" else "0"
+                )
             )
-        )
-        return json.optInt("code") == 0
+            json.optInt("code") == 0
+        } catch (e: BiliApiException) {
+            if (e.code == 65006) true else throw e
+        }
     }
 
     suspend fun coin(aid: Long, multiply: Int = 2, selectLike: Boolean = true): Boolean {
         requireLogin()
-        val json = restClient.postSigned(
-            url = "${BiliConstants.BASE_URL_APP}/x/v2/view/coin/add",
-            params = commonParams() + mapOf(
-                "aid" to aid.toString(),
-                "multiply" to multiply.coerceIn(1, 2).toString(),
-                "select_like" to if (selectLike) "1" else "0"
+        return try {
+            val json = restClient.postSigned(
+                url = "${BiliConstants.BASE_URL_APP}/x/v2/view/coin/add",
+                params = commonParams() + mapOf(
+                    "aid" to aid.toString(),
+                    "multiply" to multiply.coerceIn(1, 2).toString(),
+                    "select_like" to if (selectLike) "1" else "0"
+                )
             )
-        )
-        return json.optInt("code") == 0
+            json.optInt("code") == 0
+        } catch (e: BiliApiException) {
+            if (e.code == 34005) true else throw e
+        }
     }
 
     suspend fun favorite(aid: Long, fav: Boolean): Boolean {
         requireLogin()
         val folder = favoriteRepository.fetchMyFavorites().folders.firstOrNull() ?: return false
-        val json = restClient.postSigned(
-            url = "${BiliConstants.BASE_URL_API}/medialist/gateway/coll/resource/deal",
-            params = commonParams() + buildMap {
-                put("rid", aid.toString())
-                put("type", "2")
-                put("add_media_ids", if (fav) folder.fid.toString() else "")
-                put("del_media_ids", if (fav) "" else folder.fid.toString())
-            }
-        )
-        return json.optInt("code") == 0
+        return try {
+            val json = restClient.postSigned(
+                url = "${BiliConstants.BASE_URL_API}/medialist/gateway/coll/resource/deal",
+                params = commonParams() + buildMap {
+                    put("rid", aid.toString())
+                    put("type", "2")
+                    put("add_media_ids", if (fav) folder.fid.toString() else "")
+                    put("del_media_ids", if (fav) "" else folder.fid.toString())
+                }
+            )
+            json.optInt("code") == 0
+        } catch (e: BiliApiException) {
+            if (e.code == 11201) true else throw e
+        }
     }
 
     suspend fun triple(aid: Long): VideoTripleResult {

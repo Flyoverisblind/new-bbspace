@@ -125,6 +125,7 @@ class LiveRepository @Inject constructor(
                 add(
                     LiveRecordItem(
                         recordId = recordId,
+                        liveKey = item.optString("live_key").ifBlank { null },
                         roomId = item.optLongCompat("room_id"),
                         uid = item.optLongCompat("uid")
                             .takeIf { it > 0L }

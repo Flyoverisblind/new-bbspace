@@ -76,30 +76,22 @@ fun NavGraphBuilder.spaceScreen(
     }
 }
 
-private const val LIVE_RECORD_URL_ARG = "url"
-private const val LIVE_RECORD_TITLE_ARG = "title"
+private const val LIVE_RECORD_UID_ARG = "uid"
+private const val LIVE_RECORD_ID_ARG = "recordId"
 
-fun NavController.navigateToLiveRecordPlayer(url: String, title: String?) {
-    navigate(
-        "live_record_player?$LIVE_RECORD_URL_ARG=${Uri.encode(url)}" +
-                "&$LIVE_RECORD_TITLE_ARG=${Uri.encode(title.orEmpty())}"
-    )
+fun NavController.navigateToLiveRecordPlayer(uid: Long, recordId: Long) {
+    navigate("live_record_player/$uid/$recordId")
 }
 
 fun NavGraphBuilder.liveRecordPlayerScreen(onBack: () -> Unit) {
     composable(
-        route = "live_record_player?$LIVE_RECORD_URL_ARG={$LIVE_RECORD_URL_ARG}" +
-                "&$LIVE_RECORD_TITLE_ARG={$LIVE_RECORD_TITLE_ARG}",
+        route = "live_record_player/{$LIVE_RECORD_UID_ARG}/{$LIVE_RECORD_ID_ARG}",
         arguments = listOf(
-            navArgument(LIVE_RECORD_URL_ARG) { type = NavType.StringType; defaultValue = "" },
-            navArgument(LIVE_RECORD_TITLE_ARG) { type = NavType.StringType; defaultValue = "" }
+            navArgument(LIVE_RECORD_UID_ARG) { type = NavType.LongType; defaultValue = 0L },
+            navArgument(LIVE_RECORD_ID_ARG) { type = NavType.LongType; defaultValue = 0L }
         )
-    ) { entry ->
-        LiveRecordPlayerScreen(
-            title = entry.arguments?.getString(LIVE_RECORD_TITLE_ARG),
-            url = entry.arguments?.getString(LIVE_RECORD_URL_ARG).orEmpty(),
-            onBack = onBack
-        )
+    ) {
+        LiveRecordPlayerScreen(onBack = onBack)
     }
 }
 

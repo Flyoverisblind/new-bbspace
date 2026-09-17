@@ -379,18 +379,10 @@ fun AppNavHost(
                 },
                 onOpenLive = openLive,
                 onOpenLiveRecord = { item ->
-                    val playUrl = item.playUrl
-                    if (!playUrl.isNullOrBlank()) {
-                        rootNavController.navigateToLiveRecordPlayer(
-                            url = playUrl,
-                            title = item.title
-                        )
-                    } else {
-                        rootNavController.navigateToWebView(
-                            "https://live.bilibili.com/p/html/live-app-playback/index.html" +
-                                    "?replay_id=${item.recordId}&live_uid=${item.uid}#new"
-                        )
-                    }
+                    rootNavController.navigateToLiveRecordPlayer(
+                        uid = item.uid,
+                        recordId = item.recordId
+                    )
                 },
                 onOpenIm = { mid, name, avatar ->
                     rootNavController.navigateToImConversation(

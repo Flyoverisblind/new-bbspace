@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class LiveRecordItem(
     val recordId: Long,
+    val liveKey: String?,
     val roomId: Long,
     val uid: Long,
     val title: String,

@@ -90,15 +90,6 @@ class VideoViewModel @Inject constructor(
                             bvid = ids.bvid
                         )
                     }.onSuccess { _onlineCount.value = it }
-                    runCatching {
-                        actionRepository.fetchActionState(ids.aid)
-                    }.onSuccess { action ->
-                        _actionState.value = _actionState.value.copy(
-                            isLiked = action.liked,
-                            isCoined = action.coined,
-                            isFavorited = action.favorited
-                        )
-                    }
                 } else if (ids.aid <= 0L || ids.cid <= 0L) {
                     onlineKey = null
                     _onlineCount.value = 0L
