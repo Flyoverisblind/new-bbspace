@@ -29,6 +29,7 @@ import com.naaammme.bbspace.core.designsystem.component.FilledTabRow
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.designsystem.component.VideoListCardSkeleton
 import com.naaammme.bbspace.core.model.HistoryTab
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
 import com.naaammme.bbspace.core.model.HistoryTarget
 import com.naaammme.bbspace.feature.history.component.HistoryItemCard
 import com.naaammme.bbspace.feature.history.component.HistoryListLoading
@@ -141,7 +142,13 @@ fun HistoryScreen(
                             ) { item ->
                                 HistoryItemCard(
                                     item = item,
-                                    onClick = { onOpenHistoryTarget(item.target) }
+                                    onClick = {
+                                        val target = item.target
+                                        if (target is HistoryTarget.Video) {
+                                            prepareVideoTransition(target.target, item.cover)
+                                        }
+                                        onOpenHistoryTarget(target)
+                                    }
                                 )
                             }
 

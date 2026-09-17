@@ -30,6 +30,8 @@ import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.model.LiveRecordItem
 import com.naaammme.bbspace.core.model.LiveRoute
 import com.naaammme.bbspace.core.model.SpaceTab2Item
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.model.SpaceVideo
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.feature.space.SpaceArchiveUiState
@@ -427,7 +429,10 @@ private fun SpaceVideoCard(
     }
 
     Card(
-        onClick = onClick,
+        onClick = {
+            prepareVideoTransition(video.target, video.cover)
+            onClick()
+        },
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -445,6 +450,7 @@ private fun SpaceVideoCard(
                 modifier = Modifier
                     .weight(0.38f)
                     .aspectRatio(16f / 10f)
+                    .trackVideoTransitionSource(video.target, video.cover)
             ) {
                 if (durationText != null) {
                     Text(

@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.naaammme.bbspace.core.designsystem.component.CoverImage
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.designsystem.component.VideoListCardSkeleton
 import com.naaammme.bbspace.core.model.FavoriteContentItem
 import com.naaammme.bbspace.core.model.FavoriteContentTarget
@@ -124,9 +126,13 @@ private fun FavoriteContentCard(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     )
     val target = item.target
+    val videoTarget = (target as? FavoriteContentTarget.Video)?.target
     if (target != null) {
         Card(
-            onClick = { onOpenContent(target) },
+            onClick = {
+                prepareVideoTransition(videoTarget, item.cover)
+                onOpenContent(target)
+            },
             modifier = cardModifier,
             colors = colors
         ) {
@@ -147,6 +153,7 @@ private fun FavoriteContent(
     item: FavoriteContentItem,
     modifier: Modifier = Modifier
 ) {
+    val videoTarget = (item.target as? FavoriteContentTarget.Video)?.target
     val meta = buildMetaLine(item)
     val ownerName = item.ownerName?.takeIf { it.isNotBlank() }
     Row(
@@ -161,6 +168,7 @@ private fun FavoriteContent(
             modifier = Modifier
                 .weight(0.38f)
                 .aspectRatio(16f / 10f)
+                .trackVideoTransitionSource(videoTarget, item.cover)
         ) {
             item.playbackDesc?.let { text ->
                 Text(

@@ -167,8 +167,8 @@ fun AppearanceSettingsScreen(
 
             item {
                 SettingSwitch(
-                    title = "Hero 无缝动画",
-                    subtitle = "从首页卡片飞入播放页，返回时原路飞回",
+                    title = "ColorOS 风格无缝动画",
+                    subtitle = "封面从卡片无缝展开到播放器，返回时平滑缩回",
                     checked = config.videoTransitionEnabled,
                     onCheckedChange = viewModel::updateVideoTransitionEnabled
                 )

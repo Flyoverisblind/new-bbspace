@@ -21,8 +21,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.naaammme.bbspace.core.designsystem.component.CoverImage
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.designsystem.component.rememberHighlightedTitle
 import com.naaammme.bbspace.core.model.HistoryItem
+import com.naaammme.bbspace.core.model.HistoryTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +40,7 @@ fun HistoryItemCard(
     val infoLine = remember(item) { buildInfoLine(item) }
     val metaLine = remember(item) { buildMetaLine(item) }
     val progress = remember(item) { progressText(item) }
+    val videoTarget = (item.target as? HistoryTarget.Video)?.target
     val content: @Composable () -> Unit = {
         Row(
             modifier = Modifier
@@ -50,7 +53,8 @@ fun HistoryItemCard(
                 contentDescription = item.title,
                 modifier = Modifier
                     .weight(0.38f)
-                    .aspectRatio(16f / 10f),
+                    .aspectRatio(16f / 10f)
+                    .trackVideoTransitionSource(videoTarget, item.cover),
                 fallbackContent = {
                     Text(
                         text = item.typeLabel,

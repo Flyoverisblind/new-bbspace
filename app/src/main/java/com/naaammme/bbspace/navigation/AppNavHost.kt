@@ -245,7 +245,7 @@ fun AppNavHost(
         rootNavController.popBackStack(MAIN_ROUTE, false)
         currentTab = TopLevelRoute.HOME
     }
-    val openVideo: (VideoTarget) -> Unit = { target ->
+    val startCompatVideoTransition: (VideoTarget) -> Unit = { target ->
         val source = if (themeConfig.videoTransitionEnabled) {
             VideoTransitionCoordinator.source?.takeIf { it.target.isSameEntry(target) }
         } else {
@@ -262,11 +262,15 @@ fun AppNavHost(
             videoTransition = null
             videoTransitionSource = null
         }
+    }
+    val openVideo: (VideoTarget) -> Unit = { target ->
+        startCompatVideoTransition(target)
         playbackHostViewModel.expand()
         videoViewModel.openRoot(target)
     }
     val openVideoPlaylist: (List<VideoQueueItem>, Int) -> Unit = { items, startIndex ->
         if (items.isNotEmpty()) {
+            startCompatVideoTransition(items[startIndex.coerceIn(0, items.lastIndex)].target)
             playbackHostViewModel.expand()
             videoViewModel.openPlaylist(
                 title = "收藏夹列表",

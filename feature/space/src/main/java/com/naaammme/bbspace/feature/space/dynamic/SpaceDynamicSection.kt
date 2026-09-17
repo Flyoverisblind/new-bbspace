@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.naaammme.bbspace.core.designsystem.component.CoverImage
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.model.DynamicBody
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.model.DynamicItem
 import com.naaammme.bbspace.core.model.LiveRoute
 import com.naaammme.bbspace.core.model.VideoTarget
@@ -110,7 +112,10 @@ private fun SpaceDynamicCard(
         onClick = {
             when {
                 liveRoute != null -> onOpenLive(liveRoute)
-                videoTarget != null -> onOpenVideo(videoTarget)
+                videoTarget != null -> {
+                    prepareVideoTransition(videoTarget, item.cover)
+                    onOpenVideo(videoTarget)
+                }
                 else -> onOpenDynamic(item.id)
             }
         },
@@ -130,7 +135,8 @@ private fun SpaceDynamicCard(
                 contentDescription = preview.title,
                 modifier = Modifier
                     .weight(0.38f)
-                    .aspectRatio(16f / 10f),
+                    .aspectRatio(16f / 10f)
+                    .trackVideoTransitionSource(videoTarget, item.cover),
                 fallbackContent = {
                     Text(
                         text = preview.type,

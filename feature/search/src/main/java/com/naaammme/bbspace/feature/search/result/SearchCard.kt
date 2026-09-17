@@ -38,6 +38,8 @@ import com.naaammme.bbspace.core.designsystem.component.CoverImage
 import com.naaammme.bbspace.core.designsystem.component.rememberHighlightedTitle
 import com.naaammme.bbspace.core.model.SearchAuthor
 import com.naaammme.bbspace.core.model.SearchFeedbackSec
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.model.SearchVideo
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,7 +114,10 @@ fun SearchCard(
         listOfNotNull("${video.danmakuText} 弹幕", video.publishTimeText).joinToString(" · ")
     }
     Card(
-        onClick = onClick,
+        onClick = {
+            prepareVideoTransition(video.target, video.cover)
+            onClick()
+        },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
@@ -131,6 +136,7 @@ fun SearchCard(
                 modifier = Modifier
                     .weight(0.38f)
                     .aspectRatio(16f / 10f)
+                    .trackVideoTransitionSource(video.target, video.cover)
             ) {
                 Text(
                     text = video.viewText,

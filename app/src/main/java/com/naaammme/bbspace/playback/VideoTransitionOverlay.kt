@@ -1,7 +1,7 @@
 package com.naaammme.bbspace.playback
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -93,8 +93,8 @@ fun VideoTransitionOverlay(
             right = state.source.bounds.right,
             bottom = state.source.bounds.bottom
         )
-        val current = heroFlightRect(sourceBounds, target, progress.value)
-        val radiusPx = with(density) { startRadiusDp.coerceAtLeast(0).dp.toPx() } * (1f - progress.value).let { it * it * (3f - 2f * it) }
+        val current = colorOsMorphRect(sourceBounds, target, progress.value.coerceIn(0f, 1f))
+        val radiusPx = with(density) { startRadiusDp.coerceAtLeast(0).dp.toPx() } * (1f - progress.value.coerceIn(0f, 1f))
         Box(
             modifier = Modifier
                 .offset {
@@ -112,8 +112,7 @@ fun VideoTransitionOverlay(
         ) {
             state.source.cover?.takeIf(String::isNotBlank)?.let { cover ->
                 val motionBlurDp = (
-                    kotlin.math.sin(Math.PI * progress.value).toFloat() *
-                        (6f * (1f - kotlin.math.abs(progress.value - 0.5f) * 2f))
+                    kotlin.math.sin(Math.PI * progress.value.coerceIn(0f, 1f)).toFloat() * 3f
                     ).coerceAtLeast(0f)
                 BiliAsyncImage(
                     url = cover,
@@ -128,19 +127,12 @@ fun VideoTransitionOverlay(
     }
 }
 
-private fun heroFlightRect(start: Rect, end: Rect, fraction: Float): Rect {
-    val width = lerp(start.width, end.width, fraction)
-    val height = lerp(start.height, end.height, fraction)
-    val dx = end.center.x - start.center.x
-    val dy = end.center.y - start.center.y
-    val arc = kotlin.math.sin(Math.PI * fraction).toFloat() * 0.07f
-    val centerX = lerp(start.center.x, end.center.x, fraction) - dy * arc
-    val centerY = lerp(start.center.y, end.center.y, fraction) + dx * arc
+private fun colorOsMorphRect(start: Rect, end: Rect, fraction: Float): Rect {
     return Rect(
-        left = centerX - width / 2f,
-        top = centerY - height / 2f,
-        right = centerX + width / 2f,
-        bottom = centerY + height / 2f
+        left = lerp(start.left, end.left, fraction),
+        top = lerp(start.top, end.top, fraction),
+        right = lerp(start.right, end.right, fraction),
+        bottom = lerp(start.bottom, end.bottom, fraction)
     )
 }
 

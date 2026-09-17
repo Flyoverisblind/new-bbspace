@@ -37,6 +37,8 @@ import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.designsystem.component.UpListRow
 import com.naaammme.bbspace.core.model.DynamicBody
 import com.naaammme.bbspace.core.model.DynamicImage
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.model.DynamicItem
 import com.naaammme.bbspace.core.model.DynamicUpList
 import com.naaammme.bbspace.core.model.LiveRoute
@@ -156,7 +158,10 @@ private fun DynamicCard(
     val onClick = {
         when {
             liveRoute != null -> onOpenLive(liveRoute)
-            videoTarget != null -> onOpenVideo(videoTarget)
+            videoTarget != null -> {
+                prepareVideoTransition(videoTarget, item.cover)
+                onOpenVideo(videoTarget)
+            }
             else -> onOpenDynamic(item.id)
         }
     }
@@ -260,7 +265,9 @@ private fun DynamicBodyContent(item: DynamicItem) {
                 title = body.title,
                 subTitle = body.subTitle,
                 cover = body.cover,
-                badge = body.badge
+                badge = body.badge,
+                trackTarget = item.videoTarget,
+                trackCover = item.cover
             )
         }
 
@@ -337,7 +344,9 @@ private fun DynamicMediaCard(
     title: String,
     subTitle: String?,
     cover: String?,
-    badge: String?
+    badge: String?,
+    trackTarget: com.naaammme.bbspace.core.model.VideoTarget? = null,
+    trackCover: String? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -348,7 +357,8 @@ private fun DynamicMediaCard(
                 url = it,
                 modifier = Modifier
                     .width(132.dp)
-                    .aspectRatio(16f / 10f),
+                    .aspectRatio(16f / 10f)
+                    .trackVideoTransitionSource(trackTarget, trackCover),
                 shape = MaterialTheme.shapes.small
             )
         }

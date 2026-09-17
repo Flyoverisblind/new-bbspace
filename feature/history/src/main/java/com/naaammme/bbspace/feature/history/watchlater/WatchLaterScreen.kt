@@ -42,6 +42,8 @@ import com.naaammme.bbspace.core.designsystem.component.FilledTabRow
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.designsystem.component.VideoListCardSkeleton
 import com.naaammme.bbspace.core.model.VideoTarget
+import com.naaammme.bbspace.core.designsystem.seamless.prepareVideoTransition
+import com.naaammme.bbspace.core.designsystem.seamless.trackVideoTransitionSource
 import com.naaammme.bbspace.core.model.WatchLaterItem
 import com.naaammme.bbspace.core.model.WatchLaterTab
 import com.naaammme.bbspace.feature.history.component.HistoryListLoading
@@ -160,7 +162,10 @@ fun WatchLaterScreen(
                                 WatchLaterItemCard(
                                     item = item,
                                     onClick = {
-                                        item.target?.let(onOpenVideo)
+                                        item.target?.let { target ->
+                                            prepareVideoTransition(target, item.cover)
+                                            onOpenVideo(target)
+                                        }
                                     }
                                 )
                             }
@@ -213,7 +218,11 @@ private fun WatchLaterItemCard(
     )
 
     if (item.isOpenable) {
-        Card(onClick = onClick, modifier = cardModifier, colors = colors) {
+        Card(
+            onClick = onClick,
+            modifier = cardModifier,
+            colors = colors
+        ) {
             WatchLaterItemContent(item = item)
         }
     } else {
@@ -257,6 +266,7 @@ private fun WatchLaterItemContent(
             modifier = Modifier
                 .weight(0.38f)
                 .aspectRatio(16f / 10f)
+                .trackVideoTransitionSource(item.target, item.cover)
         ) {
             duration?.let { text ->
                 Text(
