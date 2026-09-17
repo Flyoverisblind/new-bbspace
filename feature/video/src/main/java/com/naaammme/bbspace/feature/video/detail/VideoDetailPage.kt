@@ -73,6 +73,7 @@ import com.naaammme.bbspace.core.model.VideoSeasonEpisode
 import com.naaammme.bbspace.core.model.VideoStat
 import com.naaammme.bbspace.feature.comment.CommentPanel
 import com.naaammme.bbspace.feature.video.VideoActionUiState
+import com.naaammme.bbspace.feature.video.VideoPlayQueue
 import com.naaammme.bbspace.feature.video.formatDuration
 import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -88,6 +89,8 @@ internal fun VideoDetailPage(
     onCoin: () -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
+    playQueue: VideoPlayQueue?,
+    onOpenQueueItem: (Int) -> Unit,
     commentSubject: CommentSubject?,
     contentHorizontalPad: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
@@ -139,6 +142,11 @@ internal fun VideoDetailPage(
                 onCoin = onCoin,
                 onFavorite = onFavorite,
                 onTriple = onTriple,
+                playQueue = playQueue,
+                onOpenQueueItem = onOpenQueueItem,
+                onFavoriteQueueClick = {
+                    playQueue?.let { sheet = DetailSheet.FavoriteQueue(it) }
+                },
                 horizontalPad = contentHorizontalPad,
                 infoListState = detailListState,
                 descOn = descOn,
@@ -211,6 +219,17 @@ internal fun VideoDetailPage(
                         }
                     )
                 }
+
+                is DetailSheet.FavoriteQueue -> {
+                    FavoriteQueueSheetContent(
+                        queue = activeSheet.queue,
+                        onOpenItem = { index ->
+                            closeSheet {
+                                onOpenQueueItem(index)
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -228,6 +247,9 @@ private fun DetailPageContent(
     onCoin: () -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
+    playQueue: VideoPlayQueue?,
+    onOpenQueueItem: (Int) -> Unit,
+    onFavoriteQueueClick: () -> Unit,
     horizontalPad: Dp,
     infoListState: LazyListState,
     descOn: Boolean,
@@ -266,6 +288,9 @@ private fun DetailPageContent(
             onCoin = onCoin,
             onFavorite = onFavorite,
             onTriple = onTriple,
+            playQueue = playQueue,
+            onOpenQueueItem = onOpenQueueItem,
+            onFavoriteQueueClick = onFavoriteQueueClick,
             itemMod = itemMod,
             descOn = descOn,
             tagOn = tagOn,
@@ -293,6 +318,9 @@ private fun LazyListScope.detailItems(
     onCoin: () -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
+    playQueue: VideoPlayQueue?,
+    onOpenQueueItem: (Int) -> Unit,
+    onFavoriteQueueClick: () -> Unit,
     itemMod: Modifier,
     descOn: Boolean,
     tagOn: Boolean,
@@ -360,6 +388,19 @@ private fun LazyListScope.detailItems(
                     onTriple = onTriple,
                     modifier = itemMod
                 )
+            }
+
+            playQueue?.let { queue ->
+                item(
+                    key = "favorite_queue_entry",
+                    contentType = "favorite_queue_entry"
+                ) {
+                    FavoriteQueueEntryCard(
+                        queue = queue,
+                        onClick = onFavoriteQueueClick,
+                        modifier = itemMod
+                    )
+                }
             }
 
             detail.season?.let { season ->
@@ -641,20 +682,24 @@ private fun ActionCapsule(
                 ActionChip(
                     label = if (actionState.isLiked) "已赞" else "点赞",
                     value = it.like,
+                    selected = actionState.isLiked,
                     onClick = onLike
                 )
                 ActionChip(
                     label = if (actionState.isCoined) "已投币" else "投币",
                     value = it.coin,
+                    selected = actionState.isCoined,
                     onClick = onCoin
                 )
                 ActionChip(
                     label = if (actionState.isFavorited) "已收藏" else "收藏",
                     value = it.fav,
+                    selected = actionState.isFavorited,
                     onClick = onFavorite
                 )
                 ActionChip(
                     label = "一键三连",
+                    selected = actionState.isLiked && actionState.isCoined && actionState.isFavorited,
                     onClick = onTriple
                 )
                 ActionChip(label = "分享", value = it.share)
@@ -760,15 +805,26 @@ private fun ToggleChip(
 private fun ActionChip(
     label: String,
     value: String? = null,
+    selected: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
+    val container = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    }
     Surface(
         modifier = if (onClick != null) {
             Modifier.clickable(onClick = onClick)
         } else {
             Modifier
         },
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = container,
         shape = MaterialTheme.shapes.extraLarge
     ) {
         Row(
@@ -778,6 +834,14 @@ private fun ActionChip(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = content,
+                    modifier = Modifier.width(16.dp)
+                )
+            }
             Text(
                 text = label,
                 style = if (value == null) {
@@ -785,13 +849,13 @@ private fun ActionChip(
                 } else {
                     MaterialTheme.typography.labelMedium
                 },
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = content
             )
             value?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = content
                 )
             }
         }
@@ -843,6 +907,135 @@ private fun SeasonEntryCard(
                 )
                 TextButton(onClick = onPlayAll) {
                     Text("播放全部")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteQueueEntryCard(
+    queue: VideoPlayQueue,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val current = queue.items.getOrNull(queue.currentIndex)
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "收藏夹列表",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = current?.title ?: "收藏夹",
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            current?.ownerName?.takeIf(String::isNotBlank)?.let { owner ->
+                Text(
+                    text = owner,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = "${queue.items.size} 个视频",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteQueueSheetContent(
+    queue: VideoPlayQueue,
+    onOpenItem: (Int) -> Unit
+) {
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = queue.currentIndex.coerceAtLeast(0)
+    )
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item(key = "favorite_queue_title", contentType = "title") {
+            Text(
+                text = "收藏夹列表",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+        items(
+            items = queue.items,
+            key = { "favorite_queue_${it.target.hashCode()}" },
+            contentType = { "favorite_queue_item" }
+        ) { item ->
+            val index = queue.items.indexOf(item)
+            val selected = index == queue.currentIndex
+            Row(
+                modifier = if (selected) {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenItem(index) }
+                        .padding(vertical = 10.dp)
+                },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                BiliAsyncImage(
+                    url = item.cover,
+                    contentDescription = item.title,
+                    modifier = Modifier
+                        .width(112.dp)
+                        .aspectRatio(16f / 10f)
+                        .clip(MaterialTheme.shapes.large),
+                    contentScale = ContentScale.Crop
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (selected) {
+                            CurBadge()
+                        }
+                    }
+                    item.ownerName?.takeIf(String::isNotBlank)?.let { owner ->
+                        Text(
+                            text = owner,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
@@ -1374,6 +1567,10 @@ private sealed interface DetailSheet {
     data class Page(
         val pages: List<VideoPagePart>,
         val curCid: Long?
+    ) : DetailSheet
+
+    data class FavoriteQueue(
+        val queue: VideoPlayQueue
     ) : DetailSheet
 }
 

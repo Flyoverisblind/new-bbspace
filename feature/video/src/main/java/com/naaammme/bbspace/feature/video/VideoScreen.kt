@@ -78,6 +78,7 @@ fun VideoScreen(
 ) {
     val videoState by viewModel.videoState.collectAsStateWithLifecycle()
     val actionState by viewModel.actionState.collectAsStateWithLifecycle()
+    val playQueue by viewModel.playQueueState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val act = LocalActivity.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -223,6 +224,8 @@ fun VideoScreen(
                         onCoin = viewModel::coinVideo,
                         onFavorite = viewModel::favoriteVideo,
                         onTriple = viewModel::tripleVideo,
+                        playQueue = playQueue,
+                        onOpenQueueItem = viewModel::switchPlayQueueItem,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 0.dp,
                         onOpenVideo = openTarget,
@@ -268,6 +271,8 @@ fun VideoScreen(
                         onCoin = viewModel::coinVideo,
                         onFavorite = viewModel::favoriteVideo,
                         onTriple = viewModel::tripleVideo,
+                        playQueue = playQueue,
+                        onOpenQueueItem = viewModel::switchPlayQueueItem,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 16.dp,
                         onOpenVideo = openTarget,
