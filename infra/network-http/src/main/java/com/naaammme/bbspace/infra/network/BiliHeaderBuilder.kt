@@ -39,6 +39,8 @@ class BiliHeaderBuilder @Inject constructor(
             put("bili-http-engine", "ignet")
             put("buvid", deviceIdentity.buvid)
             put("content-type", "application/x-www-form-urlencoded; charset=utf-8")
+            val cookie = authProvider.cookieHeader
+            if (cookie.isNotBlank()) put("cookie", cookie)
             put("env", BiliConstants.ENV)
             put("fp_local", deviceIdentity.fp)
             put("fp_remote", deviceIdentity.fp)

@@ -11,9 +11,16 @@ data class LiveRecordItem(
     val title: String,
     val cover: String?,
     val startTimeSec: Long?,
+    val endTimeSec: Long?,
     val durationSec: Long?,
     val online: Long?,
-    val playUrl: String?
+    val playUrl: String?,
+    val ownerName: String? = null,
+    val ownerFace: String? = null,
+    val avid: Long? = null,
+    val cid: Long? = null,
+    val viewCount: Long? = null,
+    val danmakuCount: Long? = null
 )
 
 @Immutable

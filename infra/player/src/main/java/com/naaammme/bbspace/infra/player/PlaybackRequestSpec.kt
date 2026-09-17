@@ -10,6 +10,7 @@ internal data class PlaybackRequestSpec(
 internal fun EngineSource.toPlaybackRequestSpec(): PlaybackRequestSpec {
     val useWebHeaders = when (this) {
         is EngineSource.LiveFlv -> false
+        is EngineSource.Hls -> url.contains("platform=pc", ignoreCase = true)
         is EngineSource.LocalMerged -> false
         is EngineSource.SingleFileDash -> videoUrl.isWebPlaybackUrl() || audioUrl?.isWebPlaybackUrl() == true
         is EngineSource.Progressive -> segments.any { it.url.isWebPlaybackUrl() }

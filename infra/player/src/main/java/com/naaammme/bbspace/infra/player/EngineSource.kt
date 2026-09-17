@@ -4,6 +4,8 @@ sealed interface EngineSource {
 
     data class LiveFlv(val url: String) : EngineSource
 
+    data class Hls(val url: String) : EngineSource
+
     data class LocalMerged(
         val videoUrl: String,
         val audioUrl: String? = null

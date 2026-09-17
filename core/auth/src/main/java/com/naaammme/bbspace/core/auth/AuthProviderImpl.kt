@@ -10,4 +10,10 @@ class AuthProviderImpl @Inject constructor(
 ) : AuthProvider {
     override val mid: Long get() = authStore.mid
     override val accessToken: String get() = authStore.accessToken
+    override val cookieHeader: String
+        get() = authStore.getSavedCredential()
+            ?.cookies
+            ?.joinToString("; ") { "${it.name}=${it.value}" }
+            .orEmpty()
+    override val csrfToken: String get() = authStore.biliJct
 }

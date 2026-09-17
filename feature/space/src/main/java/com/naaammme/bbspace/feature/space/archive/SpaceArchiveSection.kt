@@ -1,6 +1,8 @@
 package com.naaammme.bbspace.feature.space.archive
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +29,7 @@ import com.naaammme.bbspace.core.designsystem.component.FilledTabRow
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.model.LiveRecordItem
 import com.naaammme.bbspace.core.model.LiveRoute
+import com.naaammme.bbspace.core.model.SpaceTab2Item
 import com.naaammme.bbspace.core.model.SpaceVideo
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.feature.space.SpaceArchiveUiState
@@ -40,13 +44,19 @@ internal fun LazyListScope.spaceArchiveSection(
     videoCount: Int,
     dynamics: SpaceDynamicUiState,
     liveRecords: SpaceLiveRecordUiState,
+    contributeTabs: List<SpaceTab2Item>,
+    selectedContributeIndex: Int,
+    contributeVideos: List<SpaceVideo>,
+    contributeLoading: Boolean,
+    contributeMessage: String?,
     section: SpaceSection,
     onOpenVideo: (VideoTarget) -> Unit,
     onSelectOrder: (String) -> Unit,
     onSelectSection: (SpaceSection) -> Unit,
+    onSelectContribute: (Int) -> Unit,
     onOpenDynamic: (String) -> Unit,
     onOpenLive: (LiveRoute) -> Unit,
-    onOpenLiveRecord: (LiveRecordItem) -> Unit,
+    onOpenLiveRecord: (List<LiveRecordItem>, Int) -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit
 ) {
@@ -54,22 +64,51 @@ internal fun LazyListScope.spaceArchiveSection(
         key = "space_section_bar",
         contentType = "section_bar"
     ) {
-        val sections = SpaceSection.entries
+        val isDynamic = section == SpaceSection.DYNAMIC
         FilledTabRow(
-            tabs = listOf("视频", "动态", "录播"),
-            selectedIndex = sections.indexOf(section).coerceAtLeast(0),
-            onSelect = { index -> onSelectSection(sections[index]) }
+            tabs = listOf("投稿", "动态"),
+            selectedIndex = if (isDynamic) 1 else 0,
+            onSelect = { index ->
+                onSelectSection(if (index == 0) SpaceSection.VIDEO else SpaceSection.DYNAMIC)
+            }
         )
     }
 
+    if (section != SpaceSection.DYNAMIC) {
+        item(
+            key = "space_contribute_section_bar",
+            contentType = "section_bar"
+        ) {
+            if (contributeTabs.isNotEmpty()) {
+                val selected = selectedContributeIndex.coerceIn(0, contributeTabs.lastIndex)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    contributeTabs.forEachIndexed { index, item ->
+                        FilterChip(
+                            selected = index == selected,
+                            onClick = { onSelectContribute(index) },
+                            label = { Text(item.title) }
+                        )
+                    }
+                }
+            } else {
+                FilledTabRow(
+                    tabs = listOf("视频", "直播回放"),
+                    selectedIndex = if (section == SpaceSection.LIVE_RECORD) 1 else 0,
+                    onSelect = { index ->
+                        onSelectSection(if (index == 0) SpaceSection.VIDEO else SpaceSection.LIVE_RECORD)
+                    }
+                )
+            }
+        }
+    }
+
     when (section) {
-        SpaceSection.VIDEO -> videoSection(
-            state = state,
-            videoCount = videoCount,
-            onOpenVideo = onOpenVideo,
-            onSelectOrder = onSelectOrder,
-            onRetryLoadMore = onLoadMore
-        )
         SpaceSection.DYNAMIC -> spaceDynamicSection(
             state = dynamics,
             onOpenDynamic = onOpenDynamic,
@@ -78,17 +117,82 @@ internal fun LazyListScope.spaceArchiveSection(
             onRetry = onRefresh,
             onLoadMore = onLoadMore
         )
-        SpaceSection.LIVE_RECORD -> liveRecordSection(
-            state = liveRecords,
-            onOpenLiveRecord = onOpenLiveRecord,
-            onRetryLoadMore = onLoadMore
-        )
+        else -> {
+            val active = contributeTabs.getOrNull(selectedContributeIndex)
+            when {
+                active?.param == "live_playback" ||
+                        (contributeTabs.isEmpty() && section == SpaceSection.LIVE_RECORD) ->
+                    liveRecordSection(
+                        state = liveRecords,
+                        onOpenLiveRecord = onOpenLiveRecord,
+                        onRetryLoadMore = onLoadMore
+                    )
+                active?.param == "season_video" || active?.param == "series" ->
+                    contributeVideoSection(
+                        videos = contributeVideos,
+                        loading = contributeLoading,
+                        message = contributeMessage,
+                        onOpenVideo = onOpenVideo,
+                        onRetry = onRefresh
+                    )
+                else -> videoSection(
+                    state = state,
+                    videoCount = videoCount,
+                    onOpenVideo = onOpenVideo,
+                    onSelectOrder = onSelectOrder,
+                    onRetryLoadMore = onLoadMore
+                )
+            }
+        }
+    }
+}
+
+private fun LazyListScope.contributeVideoSection(
+    videos: List<SpaceVideo>,
+    loading: Boolean,
+    message: String?,
+    onOpenVideo: (VideoTarget) -> Unit,
+    onRetry: () -> Unit
+) {
+    when {
+        loading && videos.isEmpty() -> {
+            item(key = "contribute_loading", contentType = "state") {
+                StateMessageCard(text = "加载中...")
+            }
+        }
+        message != null && videos.isEmpty() -> {
+            item(key = "contribute_error", contentType = "state") {
+                StateMessageCard(
+                    text = message,
+                    isError = true,
+                    actionText = "重试",
+                    onAction = onRetry
+                )
+            }
+        }
+        videos.isEmpty() -> {
+            item(key = "contribute_empty", contentType = "state") {
+                StateMessageCard(text = "暂无内容")
+            }
+        }
+        else -> {
+            items(
+                items = videos,
+                key = { "contribute_${it.aid}_${it.cid}" },
+                contentType = { "video" }
+            ) { video ->
+                SpaceVideoCard(
+                    video = video,
+                    onClick = { onOpenVideo(video.target) }
+                )
+            }
+        }
     }
 }
 
 private fun LazyListScope.liveRecordSection(
     state: SpaceLiveRecordUiState,
-    onOpenLiveRecord: (LiveRecordItem) -> Unit,
+    onOpenLiveRecord: (List<LiveRecordItem>, Int) -> Unit,
     onRetryLoadMore: () -> Unit
 ) {
     item(
@@ -119,9 +223,10 @@ private fun LazyListScope.liveRecordSection(
                 key = { "live_record_${it.recordId}" },
                 contentType = { "live_record" }
             ) { item ->
+                val index = state.items.indexOf(item)
                 LiveRecordCard(
                     item = item,
-                    onClick = { onOpenLiveRecord(item) }
+                    onClick = { onOpenLiveRecord(state.items, index) }
                 )
             }
         }

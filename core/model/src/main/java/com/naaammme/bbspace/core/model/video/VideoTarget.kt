@@ -32,6 +32,25 @@ sealed interface VideoTarget {
         val seasonId: Long? = null,
         override val src: VideoSrc = VideoTargetTool.feed()
     ) : VideoTarget
+
+    @Immutable
+    data class LiveRecord(
+        val recordId: Long,
+        val liveKey: String?,
+        val uid: Long,
+        val roomId: Long,
+        val startTimeSec: Long,
+        val endTimeSec: Long,
+        val title: String,
+        val cover: String? = null,
+        val ownerName: String? = null,
+        val ownerFace: String? = null,
+        val avid: Long? = null,
+        val cid: Long? = null,
+        val viewCount: Long? = null,
+        val danmakuCount: Long? = null,
+        override val src: VideoSrc = VideoTargetTool.default()
+    ) : VideoTarget
 }
 
 fun VideoTarget.isSameEntry(other: VideoTarget?): Boolean {
@@ -50,6 +69,7 @@ fun VideoTarget.isSameEntry(other: VideoTarget?): Boolean {
                     aid > 0L && other.aid > 0L && aid == other.aid ||
                     seasonId != null && seasonId == other.seasonId
                 )
+        is VideoTarget.LiveRecord -> other is VideoTarget.LiveRecord && recordId == other.recordId
     }
 }
 
@@ -73,6 +93,8 @@ fun VideoTarget.toPlayableParams(): PlayableParams {
             epId = epId,
             seasonId = seasonId ?: 0L
         )
+
+        is VideoTarget.LiveRecord -> VideoRequestIds()
     }
     val biz = when (this) {
         is VideoTarget.Ugc -> PlayBizInfo(biz = PlayBiz.UGC)
@@ -88,6 +110,8 @@ fun VideoTarget.toPlayableParams(): PlayableParams {
             seasonId = seasonId?.takeIf { it > 0L },
             epId = epId.takeIf { it > 0L }
         )
+
+        is VideoTarget.LiveRecord -> PlayBizInfo(biz = PlayBiz.UGC)
     }
     return when (this) {
         is VideoTarget.Ugc,
@@ -97,6 +121,8 @@ fun VideoTarget.toPlayableParams(): PlayableParams {
             src = src,
             biz = biz
         )
+
+        is VideoTarget.LiveRecord -> error("LiveRecord does not use PlayableParams")
     }
 }
 

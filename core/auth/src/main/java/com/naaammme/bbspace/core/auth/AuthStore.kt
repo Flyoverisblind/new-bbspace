@@ -38,6 +38,12 @@ class AuthStore @Inject constructor(
     val mid: Long get() = if (guestMode) 0L else prefs.getLong("mid", 0)
     val accessToken: String get() = if (guestMode) "" else prefs.getString("access_token", "") ?: ""
     val refreshToken: String get() = if (guestMode) "" else prefs.getString("refresh_token", "") ?: ""
+    val biliJct: String
+        get() = getSavedCredential()
+            ?.cookies
+            ?.firstOrNull { it.name == "bili_jct" }
+            ?.value
+            .orEmpty()
 
     fun saveHdAccessKey(mid: Long, key: String, expiresIn: Long) {
         if (mid == 0L || key.isEmpty()) return

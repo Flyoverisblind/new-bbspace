@@ -18,6 +18,11 @@ import javax.inject.Singleton
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class LiveRecordStream(
+    val type: Int,
+    val url: String
+)
+
 @Singleton
 class LiveRepository @Inject constructor(
     private val restClient: BiliRestClient,
@@ -117,6 +122,18 @@ class LiveRepository @Inject constructor(
                     ?: continue
                 val liveInfo = item.optJSONObjectSafe("live_info")
                 val videoInfo = item.optJSONObjectSafe("video_info")
+                val avid = item.optLongCompat("avid").takeIf { it > 0L }
+                    ?: item.optLongCompat("aid").takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("avid")?.takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("aid")?.takeIf { it > 0L }
+                val cid = item.optLongCompat("cid").takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("cid")?.takeIf { it > 0L }
+                val viewCount = item.optLongCompat("play").takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("play")?.takeIf { it > 0L }
+                val danmakuCount = item.optLongCompat("danmu").takeIf { it > 0L }
+                    ?: item.optLongCompat("danmaku").takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("danmu")?.takeIf { it > 0L }
+                    ?: videoInfo?.optLongCompat("danmaku")?.takeIf { it > 0L }
                 val title = liveInfo?.optString("title")
                     .orEmpty()
                     .ifBlank { item.optString("title") }
@@ -140,6 +157,7 @@ class LiveRepository @Inject constructor(
                         startTimeSec = item.optLongCompat("start_time")
                             .takeIf { it > 0L }
                             ?: liveInfo?.optLongCompat("live_time")?.takeIf { it > 0L },
+                        endTimeSec = item.optLongCompat("end_time").takeIf { it > 0L },
                         durationSec = videoInfo?.optLongCompat("duration")?.takeIf { it > 0L }
                             ?: item.optLongCompat("duration").takeIf { it > 0L }
                             ?: item.optLongCompat("live_time").takeIf { it > 0L },
@@ -147,7 +165,11 @@ class LiveRepository @Inject constructor(
                         playUrl = videoInfo?.optString("download_url")
                             ?.ifBlank { item.optString("play_url") }
                             ?.ifBlank { item.optString("url") }
-                            ?.takeIf { it.isNotBlank() }
+                            ?.takeIf { it.isNotBlank() },
+                        avid = avid,
+                        cid = cid,
+                        viewCount = viewCount,
+                        danmakuCount = danmakuCount
                     )
                 )
             }
@@ -190,6 +212,135 @@ class LiveRepository @Inject constructor(
 
     private fun JSONObject.optJSONArraySafe(key: String): JSONArray? {
         return runCatching { optJSONArray(key) }.getOrNull() ?: (opt(key) as? JSONArray)
+    }
+
+    suspend fun fetchPublishedRecords(
+        uid: Long,
+        page: Int = 1,
+        pageSize: Int = 20
+    ): List<LiveRecordItem> {
+        if (uid <= 0L) return emptyList()
+        val ts = System.currentTimeMillis() / 1000L
+        val params = restParamBuilder.app(BiliRestProfile.APP, ts, authStore.accessToken) + buildMap {
+            put("live_uid", uid.toString())
+            put("page", page.coerceAtLeast(1).toString())
+            put("page_size", pageSize.coerceIn(1, 20).toString())
+            put("web_location", "333.999")
+        }
+        val json = restClient.getSigned(
+            url = "${BiliConstants.BASE_URL_LIVE_API}$LIVE_RECORD_PUBLISHED_ENDPOINT",
+            params = params,
+            profile = BiliRestProfile.APP
+        )
+        val data = json.optJSONObjectSafe("data") ?: return emptyList()
+        val list = data.optJSONArraySafe("slice_info")
+            ?: data.optJSONArraySafe("list")
+            ?: return emptyList()
+        return buildList {
+            for (i in 0 until list.length()) {
+                val item = list.optJSONObject(i) ?: continue
+                val status = item.optInt("status", 0)
+                val avid = item.optLongCompat("avid").takeIf { it > 0L }
+                if (status != 2 && avid == null) continue
+                val title = item.optString("title").ifBlank { "直播回放" }
+                val cover = item.optString("cover").httpsImageUrl().ifBlank { null }
+                add(
+                    LiveRecordItem(
+                        recordId = item.optLongCompat("slice_id").takeIf { it > 0L }
+                            ?: avid
+                            ?: continue,
+                        liveKey = item.optString("live_key").ifBlank { null },
+                        roomId = 0L,
+                        uid = item.optLongCompat("live_uid").takeIf { it > 0L } ?: uid,
+                        title = title,
+                        cover = cover,
+                        startTimeSec = null,
+                        endTimeSec = null,
+                        durationSec = item.optLongCompat("av_duration").takeIf { it > 0L },
+                        online = null,
+                        playUrl = null,
+                        avid = avid,
+                        cid = item.optLongCompat("cid").takeIf { it > 0L }
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun fetchRecordStreams(
+        liveKey: String,
+        startTime: Long,
+        endTime: Long,
+        liveUid: Long
+    ): List<LiveRecordStream> {
+        if (liveKey.isBlank() || startTime <= 0L || endTime <= 0L || liveUid <= 0L) return emptyList()
+        val ts = System.currentTimeMillis() / 1000L
+        val params = restParamBuilder.app(BiliRestProfile.APP, ts, authStore.accessToken) + buildMap {
+            put("live_key", liveKey)
+            put("start_time", startTime.toString())
+            put("end_time", endTime.toString())
+            put("live_uid", liveUid.toString())
+            put("web_location", "333.999")
+        }
+        val json = restClient.getSigned(
+            url = "${BiliConstants.BASE_URL_LIVE_API}$LIVE_RECORD_STREAM_ENDPOINT",
+            params = params,
+            profile = BiliRestProfile.APP
+        )
+        val list = json.optJSONObject("data")?.optJSONArray("list") ?: return emptyList()
+        return buildList {
+            for (i in 0 until list.length()) {
+                val item = list.optJSONObject(i) ?: continue
+                val url = item.optString("stream")
+                    .ifBlank { item.optString("url") }
+                    .takeIf(String::isNotBlank)
+                    ?: continue
+                add(
+                    LiveRecordStream(
+                        type = item.optInt("type", i + 1),
+                        url = url
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun fetchRecordStream(
+        liveKey: String,
+        startTime: Long,
+        endTime: Long,
+        liveUid: Long
+    ): String? = fetchRecordStreams(liveKey, startTime, endTime, liveUid)
+        .firstOrNull()
+        ?.url
+
+    suspend fun fetchRecordDownloadUrl(
+        recordId: Long,
+        liveKey: String?
+    ): String? {
+        if (recordId <= 0L) return null
+        val ts = System.currentTimeMillis() / 1000L
+        val csrf = authStore.biliJct
+        val params = restParamBuilder.app(BiliRestProfile.APP, ts, authStore.accessToken) + buildMap {
+            put("record_id", recordId.toString())
+            liveKey?.takeIf(String::isNotBlank)?.let { put("live_key", it) }
+            if (csrf.isNotBlank()) {
+                put("csrf", csrf)
+                put("csrf_token", csrf)
+            }
+        }
+        val json = restClient.postSignedRaw(
+            url = "${BiliConstants.BASE_URL_LIVE_API}$LIVE_RECORD_DOWNLOAD_ENDPOINT",
+            params = params,
+            profile = BiliRestProfile.APP
+        )
+        if (json.optInt("code") != 0) return null
+        val data = json.optJSONObject("data") ?: return null
+        return data.optString("download_url")
+            .takeIf(String::isNotBlank)
+            ?: data.optJSONArray("download_url_list")
+                ?.optString(0)
+                ?.takeIf(String::isNotBlank)
     }
 
     private fun buildParams(
@@ -344,6 +495,9 @@ class LiveRepository @Inject constructor(
         const val ROOM_PLAY_INFO_ENDPOINT = "/xlive/app-room/v2/index/getRoomPlayInfo"
         const val ROOM_ENTRY_ACTION_ENDPOINT = "/xlive/app-room/v1/index/roomEntryAction"
         const val LIVE_RECORD_LIST_ENDPOINT = "/xlive/web-room/v1/videoService/GetOtherSliceList"
+        const val LIVE_RECORD_STREAM_ENDPOINT = "/xlive/web-room/v1/videoService/GetUserSliceStream"
+        const val LIVE_RECORD_DOWNLOAD_ENDPOINT = "/xlive/app-blink/v1/anchorVideo/AnchorVideoDownload"
+        const val LIVE_RECORD_PUBLISHED_ENDPOINT = "/xlive/web-room/v1/videoService/GetPublishedList"
     }
 }
 

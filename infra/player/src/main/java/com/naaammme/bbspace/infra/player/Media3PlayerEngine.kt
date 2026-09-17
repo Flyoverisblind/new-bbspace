@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -346,6 +347,13 @@ class Media3PlayerEngine @Inject constructor(
                     .setLiveConfiguration(MediaItem.LiveConfiguration.Builder().build())
                     .build()
                 mediaSourceFactory.createMediaSource(item)
+            }
+
+            is EngineSource.Hls -> {
+                val upstreamFactory = OkHttpDataSource.Factory(videoOkHttpClient)
+                val dataSourceFactory = DefaultDataSource.Factory(appContext, upstreamFactory)
+                HlsMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(mediaItem(source.url, metadata))
             }
 
             is EngineSource.LocalMerged -> {

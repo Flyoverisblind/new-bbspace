@@ -41,7 +41,11 @@ data class VideoPlayQueue(
 data class VideoActionUiState(
     val isLiked: Boolean = false,
     val isCoined: Boolean = false,
+    val coinCount: Int = 0,
     val isFavorited: Boolean = false,
+    val likeDelta: Int = 0,
+    val coinDelta: Int = 0,
+    val favDelta: Int = 0,
     val isWorking: Boolean = false,
     val message: String? = null
 )
@@ -63,6 +67,7 @@ class VideoViewModel @Inject constructor(
     private val _actionState = MutableStateFlow(VideoActionUiState())
     private val _onlineCount = MutableStateFlow(0L)
     private var onlineKey: Pair<Long, Long>? = null
+    private var actionKey: Pair<Long, Long>? = null
 
     val playQueueState: StateFlow<VideoPlayQueue?> = _playQueueState
     val actionState: StateFlow<VideoActionUiState> = _actionState
@@ -81,6 +86,24 @@ class VideoViewModel @Inject constructor(
             videoState.collect { state ->
                 val ids = state.ids
                 val key = ids.aid to ids.cid
+                if (ids.aid > 0L && actionKey != key) {
+                    actionKey = key
+                    _actionState.value = VideoActionUiState()
+                    viewModelScope.launch {
+                        runCatching {
+                            actionRepository.fetchActionState(ids.aid)
+                        }.onSuccess { action ->
+                            if (actionKey == key) {
+                                _actionState.value = _actionState.value.copy(
+                                    isLiked = action.liked,
+                                    isCoined = action.coined,
+                                    coinCount = action.coinCount,
+                                    isFavorited = action.favorited
+                                )
+                            }
+                        }
+                    }
+                }
                 if (ids.aid > 0L && ids.cid > 0L && key != onlineKey) {
                     onlineKey = key
                     runCatching {
@@ -90,9 +113,12 @@ class VideoViewModel @Inject constructor(
                             bvid = ids.bvid
                         )
                     }.onSuccess { _onlineCount.value = it }
-                } else if (ids.aid <= 0L || ids.cid <= 0L) {
+                } else if (ids.aid <= 0L) {
                     onlineKey = null
                     _onlineCount.value = 0L
+                }
+                if (ids.aid <= 0L) {
+                    actionKey = null
                     _actionState.value = VideoActionUiState()
                 }
             }
@@ -200,19 +226,41 @@ class VideoViewModel @Inject constructor(
     }
 
     fun likeVideo() {
+        if (currentTarget() is VideoTarget.LiveRecord && videoState.value.ids.aid <= 0L) {
+            val liked = !_actionState.value.isLiked
+            _actionState.value = _actionState.value.copy(
+                isLiked = liked,
+                likeDelta = _actionState.value.likeDelta + if (liked) 1 else -1,
+                message = if (liked) "已点赞" else "已取消赞"
+            )
+            return
+        }
         val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        val previous = _actionState.value
+        val nextLiked = !previous.isLiked
+        _actionState.value = previous.copy(
+            isLiked = nextLiked,
+            likeDelta = previous.likeDelta + if (nextLiked) 1 else -1,
+            isWorking = true,
+            message = if (nextLiked) "已点赞" else "已取消赞"
+        )
         viewModelScope.launch {
-            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
             runCatching {
-                actionRepository.like(aid, liked = _actionState.value.isLiked)
+                actionRepository.like(aid, liked = !nextLiked)
             }.onSuccess { ok ->
-                _actionState.value = _actionState.value.copy(
-                    isLiked = if (ok) !_actionState.value.isLiked else _actionState.value.isLiked,
-                    isWorking = false,
-                    message = if (ok) null else "点赞失败"
-                )
+                if (!ok) {
+                    _actionState.value = previous.copy(
+                        isWorking = false,
+                        message = "点赞失败"
+                    )
+                } else {
+                    _actionState.value = _actionState.value.copy(
+                        isWorking = false,
+                        message = if (nextLiked) "已点赞" else "已取消赞"
+                    )
+                }
             }.onFailure { error ->
-                _actionState.value = _actionState.value.copy(
+                _actionState.value = previous.copy(
                     isWorking = false,
                     message = error.message ?: "点赞失败"
                 )
@@ -220,21 +268,50 @@ class VideoViewModel @Inject constructor(
         }
     }
 
-    fun coinVideo() {
+    fun coinVideo(count: Int = 2) {
+        if (currentTarget() is VideoTarget.LiveRecord && videoState.value.ids.aid <= 0L) {
+            _actionState.value = _actionState.value.copy(
+                isCoined = true,
+                coinCount = count.coerceIn(1, 2),
+                isLiked = true,
+                coinDelta = _actionState.value.coinDelta + count.coerceIn(1, 2),
+                likeDelta = if (_actionState.value.isLiked) _actionState.value.likeDelta else _actionState.value.likeDelta + 1,
+                message = "投币成功"
+            )
+            return
+        }
         val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        val previous = _actionState.value
+        _actionState.value = previous.copy(
+            isCoined = true,
+            coinCount = count.coerceIn(1, 2),
+            isLiked = true,
+            coinDelta = previous.coinDelta + count.coerceIn(1, 2),
+            likeDelta = if (previous.isLiked) previous.likeDelta else previous.likeDelta + 1,
+            isWorking = true,
+            message = "投币成功"
+        )
         viewModelScope.launch {
-            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
             runCatching {
-                actionRepository.coin(aid, multiply = 2, selectLike = true)
-            }.onSuccess { ok ->
-                _actionState.value = _actionState.value.copy(
-                    isCoined = if (ok) true else _actionState.value.isCoined,
-                    isLiked = if (ok) true else _actionState.value.isLiked,
-                    isWorking = false,
-                    message = if (ok) null else "投币失败"
+                actionRepository.coin(
+                    aid = aid,
+                    multiply = count.coerceIn(1, 2),
+                    selectLike = true
                 )
+            }.onSuccess { ok ->
+                if (ok) {
+                    _actionState.value = _actionState.value.copy(
+                        isWorking = false,
+                        message = "投币成功"
+                    )
+                } else {
+                    _actionState.value = previous.copy(
+                        isWorking = false,
+                        message = "投币失败"
+                    )
+                }
             }.onFailure { error ->
-                _actionState.value = _actionState.value.copy(
+                _actionState.value = previous.copy(
                     isWorking = false,
                     message = error.message ?: "投币失败"
                 )
@@ -243,19 +320,41 @@ class VideoViewModel @Inject constructor(
     }
 
     fun favoriteVideo() {
+        if (currentTarget() is VideoTarget.LiveRecord && videoState.value.ids.aid <= 0L) {
+            val fav = !_actionState.value.isFavorited
+            _actionState.value = _actionState.value.copy(
+                isFavorited = fav,
+                favDelta = _actionState.value.favDelta + if (fav) 1 else -1,
+                message = if (fav) "已收藏" else "已取消收藏"
+            )
+            return
+        }
         val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        val previous = _actionState.value
+        val nextFav = !previous.isFavorited
+        _actionState.value = previous.copy(
+            isFavorited = nextFav,
+            favDelta = previous.favDelta + if (nextFav) 1 else -1,
+            isWorking = true,
+            message = if (nextFav) "已收藏" else "已取消收藏"
+        )
         viewModelScope.launch {
-            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
             runCatching {
-                actionRepository.favorite(aid, fav = !_actionState.value.isFavorited)
+                actionRepository.favorite(aid, fav = nextFav)
             }.onSuccess { ok ->
-                _actionState.value = _actionState.value.copy(
-                    isFavorited = if (ok) !_actionState.value.isFavorited else _actionState.value.isFavorited,
-                    isWorking = false,
-                    message = if (ok) null else "收藏失败"
-                )
+                _actionState.value = if (ok) {
+                    _actionState.value.copy(
+                        isWorking = false,
+                        message = if (nextFav) "已收藏" else "已取消收藏"
+                    )
+                } else {
+                    previous.copy(
+                        isWorking = false,
+                        message = "收藏失败"
+                    )
+                }
             }.onFailure { error ->
-                _actionState.value = _actionState.value.copy(
+                _actionState.value = previous.copy(
                     isWorking = false,
                     message = error.message ?: "收藏失败"
                 )
@@ -264,6 +363,19 @@ class VideoViewModel @Inject constructor(
     }
 
     fun tripleVideo() {
+        if (currentTarget() is VideoTarget.LiveRecord && videoState.value.ids.aid <= 0L) {
+            _actionState.value = _actionState.value.copy(
+                isLiked = true,
+                isCoined = true,
+                coinCount = 2,
+                isFavorited = true,
+                likeDelta = 1,
+                coinDelta = 2,
+                favDelta = 1,
+                message = "一键三连成功"
+            )
+            return
+        }
         val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
         viewModelScope.launch {
             _actionState.value = _actionState.value.copy(isWorking = true, message = null)
@@ -273,7 +385,11 @@ class VideoViewModel @Inject constructor(
                 _actionState.value = _actionState.value.copy(
                     isLiked = result.like,
                     isCoined = result.coin,
+                    coinCount = if (result.coin) 2 else _actionState.value.coinCount,
                     isFavorited = result.fav,
+                    likeDelta = if (result.like) 1 else 0,
+                    coinDelta = if (result.coin) 2 else 0,
+                    favDelta = if (result.fav) 1 else 0,
                     isWorking = false,
                     message = if (result.like && result.coin && result.fav) "一键三连成功" else "一键三连完成"
                 )
@@ -497,6 +613,8 @@ class VideoViewModel @Inject constructor(
             this is VideoTarget.Pugv && other is VideoTarget.Pugv ->
                 (epId > 0L && epId == other.epId) ||
                         (seasonId != null && seasonId == other.seasonId)
+            this is VideoTarget.LiveRecord && other is VideoTarget.LiveRecord ->
+                recordId == other.recordId
             else -> this == other
         }
     }

@@ -21,7 +21,23 @@ data class SpaceHome(
     val videos: List<SpaceVideo>,
     val orders: List<SpaceOrderOption>,
     val defaultOrder: String,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    val tabs: List<SpaceTab2> = emptyList()
+)
+
+@Immutable
+data class SpaceTab2(
+    val title: String,
+    val param: String,
+    val items: List<SpaceTab2Item> = emptyList()
+)
+
+@Immutable
+data class SpaceTab2Item(
+    val title: String,
+    val param: String,
+    val seasonId: Long? = null,
+    val seriesId: Long? = null
 )
 
 @Immutable
@@ -56,7 +72,8 @@ data class SpaceVideo(
     val durationSec: Long,
     val viewText: String,
     val danmakuText: String?,
-    val publishTimeText: String?
+    val publishTimeText: String?,
+    val isLivePlayback: Boolean = false
 )
 
 @Immutable

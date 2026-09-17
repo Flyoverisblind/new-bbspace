@@ -8,6 +8,7 @@ import com.naaammme.bbspace.core.dynamic.DynamicRepository
 import com.naaammme.bbspace.core.live.LiveRepository
 import com.naaammme.bbspace.core.model.LiveRecordItem
 import com.naaammme.bbspace.core.model.SpaceProfile
+import com.naaammme.bbspace.core.model.SpaceTab2Item
 import com.naaammme.bbspace.core.model.SpaceRoute
 import com.naaammme.bbspace.core.model.SpaceRouteTool
 import com.naaammme.bbspace.core.auth.AuthStore
@@ -90,6 +91,10 @@ class SpaceViewModel @Inject constructor(
                     isLogin = authStore.mid > 0L,
                     isSelf = authStore.mid > 0L && authStore.mid == home.profile.mid
                 )
+                val contributeTabs = home.tabs
+                    .firstOrNull { it.param == "contribute" }
+                    ?.items
+                    .orEmpty()
                 if (route.mid > 0L && homeOrderState.selectedOrder != home.defaultOrder) {
                     val page = repo.fetchArchive(
                         mid = route.mid,
@@ -103,6 +108,11 @@ class SpaceViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             header = headerState,
+                            contributeTabs = contributeTabs,
+                            selectedContributeIndex = 0,
+                            contributeVideos = emptyList(),
+                            contributeLoading = false,
+                            contributeMessage = null,
                             archive = it.archive.copy(
                                 videos = page.videos,
                                 orders = archiveOrderState.orders,
@@ -118,6 +128,11 @@ class SpaceViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             header = headerState,
+                            contributeTabs = contributeTabs,
+                            selectedContributeIndex = 0,
+                            contributeVideos = emptyList(),
+                            contributeLoading = false,
+                            contributeMessage = null,
                             archive = it.archive.copy(
                                 videos = home.videos,
                                 orders = homeOrderState.orders,
@@ -206,6 +221,61 @@ class SpaceViewModel @Inject constructor(
         _uiState.update { it.copy(selectedSection = section) }
         if (section == SpaceSection.LIVE_RECORD && _uiState.value.liveRecords.items.isEmpty()) {
             loadLiveRecords(refresh = true)
+        }
+    }
+
+    fun selectContribute(index: Int) {
+        val tabs = _uiState.value.contributeTabs
+        if (index !in tabs.indices) return
+        val item = tabs[index]
+        _uiState.update {
+            it.copy(
+                selectedContributeIndex = index,
+                contributeVideos = emptyList(),
+                contributeMessage = null
+            )
+        }
+        when (item.param) {
+            "live_playback" -> loadLiveRecords(refresh = true)
+            "season_video" -> item.seasonId?.let { loadCollectionVideos(item, seasonId = it) }
+            "series" -> item.seriesId?.let { loadCollectionVideos(item, seriesId = it) }
+            else -> Unit
+        }
+    }
+
+    private fun loadCollectionVideos(
+        item: SpaceTab2Item,
+        seasonId: Long? = null,
+        seriesId: Long? = null
+    ) {
+        if (route.mid <= 0L) return
+        _uiState.update {
+            it.copy(contributeLoading = true, contributeMessage = null, contributeVideos = emptyList())
+        }
+        viewModelScope.launch {
+            try {
+                val page = when {
+                    seasonId != null -> repo.fetchSeasonVideos(mid = route.mid, seasonId = seasonId)
+                    seriesId != null -> repo.fetchSeriesVideos(mid = route.mid, seriesId = seriesId)
+                    else -> null
+                }
+                _uiState.update {
+                    it.copy(
+                        contributeVideos = page?.videos.orEmpty(),
+                        contributeLoading = false,
+                        contributeMessage = if (page == null || page.videos.isEmpty()) "暂无内容" else null
+                    )
+                }
+            } catch (e: Exception) {
+                Logger.e(TAG, e) { "加载投稿分类失败" }
+                _uiState.update {
+                    it.copy(
+                        contributeLoading = false,
+                        contributeVideos = emptyList(),
+                        contributeMessage = e.message ?: "加载分类失败"
+                    )
+                }
+            }
         }
     }
 
@@ -396,7 +466,7 @@ class SpaceViewModel @Inject constructor(
         if (route.mid <= 0L) return
         if (refresh && state.isRefreshing) return
         if (!refresh && (state.isLoadingMore || !state.hasMore)) return
-        val page = if (refresh) 1 else state.page + 1
+        val nextPage = if (refresh) 1 else state.page + 1
         _uiState.update {
             it.copy(
                 liveRecords = it.liveRecords.copy(
@@ -409,20 +479,81 @@ class SpaceViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
-                val result = liveRepo.fetchLiveRecords(
-                    uid = route.mid,
-                    page = page
-                )
+                var cursorAid = if (refresh) null else state.cursorAid
+                var hasMore = true
+                var scanned = 0
+                val profile = _uiState.value.header?.profile
+                val collected = mutableListOf<LiveRecordItem>()
+                if (refresh) {
+                    collected += _uiState.value.archive.videos
+                        .filter { it.isLivePlayback }
+                        .map { video ->
+                            LiveRecordItem(
+                                recordId = video.aid,
+                                liveKey = null,
+                                roomId = 0L,
+                                uid = route.mid,
+                                title = video.title,
+                                cover = video.cover,
+                                startTimeSec = null,
+                                endTimeSec = null,
+                                durationSec = video.durationSec,
+                                online = null,
+                                playUrl = null,
+                                ownerName = profile?.name?.takeIf(String::isNotBlank) ?: video.author,
+                                ownerFace = profile?.face?.takeIf(String::isNotBlank),
+                                avid = video.aid,
+                                cid = video.cid,
+                                viewCount = video.viewText.toLongOrNull(),
+                                danmakuCount = video.danmakuText?.toLongOrNull()
+                            )
+                        }
+                }
+                while (scanned < LOAD_LIVE_RECORD_SCAN_PAGES && hasMore && collected.size < LOAD_LIVE_RECORD_BATCH) {
+                    val pageData = repo.fetchArchive(
+                        mid = route.mid,
+                        order = SPACE_DEFAULT_ORDER,
+                        cursorAid = cursorAid,
+                        fromViewAid = route.fromViewAid
+                    )
+                    collected += pageData.videos
+                        .filter { it.isLivePlayback }
+                        .map { video ->
+                            LiveRecordItem(
+                                recordId = video.aid,
+                                liveKey = null,
+                                roomId = 0L,
+                                uid = route.mid,
+                                title = video.title,
+                                cover = video.cover,
+                                startTimeSec = null,
+                                endTimeSec = null,
+                                durationSec = video.durationSec,
+                                online = null,
+                                playUrl = null,
+                                ownerName = profile?.name?.takeIf(String::isNotBlank) ?: video.author,
+                                ownerFace = profile?.face?.takeIf(String::isNotBlank),
+                                avid = video.aid,
+                                cid = video.cid,
+                                viewCount = video.viewText.toLongOrNull(),
+                                danmakuCount = video.danmakuText?.toLongOrNull()
+                            )
+                        }
+                    cursorAid = pageData.videos.lastOrNull()?.aid
+                    hasMore = pageData.hasMore
+                    scanned++
+                }
                 _uiState.update {
                     it.copy(
                         liveRecords = it.liveRecords.copy(
                             items = if (refresh) {
-                                result.items
+                                collected
                             } else {
-                                mergeLiveRecords(it.liveRecords.items, result.items)
+                                mergeLiveRecords(it.liveRecords.items, collected)
                             },
-                            page = result.page,
-                            hasMore = result.hasMore,
+                            page = nextPage,
+                            cursorAid = cursorAid,
+                            hasMore = hasMore,
                             isRefreshing = false,
                             isLoadingMore = false,
                             message = null,
@@ -527,5 +658,7 @@ class SpaceViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "SpaceViewModel"
+        const val LOAD_LIVE_RECORD_BATCH = 12
+        const val LOAD_LIVE_RECORD_SCAN_PAGES = 5
     }
 }

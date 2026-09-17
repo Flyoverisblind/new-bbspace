@@ -3,6 +3,7 @@ package com.naaammme.bbspace.navigation
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -102,8 +104,6 @@ import com.naaammme.bbspace.feature.listen.navigation.navigateToListenDetail
 import com.naaammme.bbspace.feature.live.LiveViewModel
 import com.naaammme.bbspace.feature.search.navigation.navigateToSearch
 import com.naaammme.bbspace.feature.search.navigation.searchScreen
-import com.naaammme.bbspace.feature.space.navigation.liveRecordPlayerScreen
-import com.naaammme.bbspace.feature.space.navigation.navigateToLiveRecordPlayer
 import com.naaammme.bbspace.feature.space.navigation.navigateToSpace
 import com.naaammme.bbspace.feature.space.navigation.spaceScreen
 import com.naaammme.bbspace.feature.space.navigation.spaceRelationScreen
@@ -198,7 +198,7 @@ fun AppNavHost(
         if (items.isNotEmpty()) {
             playbackHostViewModel.expand()
             videoViewModel.openPlaylist(
-                title = "收藏夹",
+                title = "收藏夹列表",
                 items = items,
                 startIndex = startIndex
             )
@@ -378,11 +378,46 @@ fun AppNavHost(
                     rootNavController.navigateToDynamicDetail(opusId)
                 },
                 onOpenLive = openLive,
-                onOpenLiveRecord = { item ->
-                    rootNavController.navigateToLiveRecordPlayer(
-                        uid = item.uid,
-                        recordId = item.recordId
-                    )
+                onOpenLiveRecord = { records, startIndex ->
+                    val playable = records.mapNotNull { item ->
+                        val start = item.startTimeSec ?: return@mapNotNull null
+                        val end = item.endTimeSec ?: return@mapNotNull null
+                        if (item.liveKey.isNullOrBlank() || item.uid <= 0L) return@mapNotNull null
+                        VideoQueueItem(
+                            target = VideoTarget.LiveRecord(
+                                recordId = item.recordId,
+                                liveKey = item.liveKey,
+                                uid = item.uid,
+                                roomId = item.roomId,
+                                startTimeSec = start,
+                                endTimeSec = end,
+                                title = item.title,
+                                cover = item.cover,
+                                ownerName = item.ownerName,
+                                ownerFace = item.ownerFace,
+                                avid = item.avid,
+                                cid = item.cid,
+                                viewCount = item.viewCount,
+                                danmakuCount = item.danmakuCount
+                            ),
+                            title = item.title,
+                            cover = item.cover,
+                            ownerName = item.ownerName,
+                            durationText = item.durationSec?.let { seconds ->
+                                val m = seconds / 60
+                                val s = seconds % 60
+                                "%d:%02d".format(m, s)
+                            }
+                        )
+                    }
+                    if (playable.isNotEmpty()) {
+                        playbackHostViewModel.expand()
+                        videoViewModel.openPlaylist(
+                            title = "直播回放列表",
+                            items = playable,
+                            startIndex = startIndex.coerceIn(0, playable.lastIndex)
+                        )
+                    }
                 },
                 onOpenIm = { mid, name, avatar ->
                     rootNavController.navigateToImConversation(
@@ -402,9 +437,6 @@ fun AppNavHost(
             spaceRelationScreen(
                 onBack = { rootNavController.popBackStack() },
                 onOpenSpace = rootNavController::navigateToSpace
-            )
-            liveRecordPlayerScreen(
-                onBack = { rootNavController.popBackStack() }
             )
             webViewScreen(
                 onBack = { rootNavController.popBackStack() },
@@ -595,16 +627,43 @@ private fun TopLevelFloatingNavigation(
         }
     }
     val searchFab: @Composable () -> Unit = {
-        FloatingActionButton(
-            onClick = onNavigateToSearch,
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "搜索"
+        Box(modifier = Modifier.size(56.dp)) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(CircleShape)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.60f),
+                                Color.White.copy(alpha = 0.20f)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 0.8.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.78f),
+                                Color.White.copy(alpha = 0.18f)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .blur(22.dp)
             )
+            FloatingActionButton(
+                onClick = onNavigateToSearch,
+                modifier = Modifier.align(Alignment.Center),
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "搜索"
+                )
+            }
         }
     }
 
@@ -620,8 +679,8 @@ private fun TopLevelFloatingNavigation(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.42f),
-                                Color.White.copy(alpha = 0.12f)
+                                Color.White.copy(alpha = 0.55f),
+                                Color.White.copy(alpha = 0.18f)
                             )
                         )
                     )
@@ -635,7 +694,7 @@ private fun TopLevelFloatingNavigation(
                         ),
                         shape = toolbarShape
                     )
-                    .blur(18.dp)
+                    .blur(32.dp)
             )
             Surface(
                 shape = toolbarShape,

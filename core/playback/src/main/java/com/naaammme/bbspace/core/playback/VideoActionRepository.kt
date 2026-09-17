@@ -18,9 +18,12 @@ data class VideoTripleResult(
 
 data class VideoActionRemoteState(
     val liked: Boolean = false,
-    val coined: Boolean = false,
+    val coinCount: Int = 0,
     val favorited: Boolean = false
-)
+) {
+    val coined: Boolean
+        get() = coinCount > 0
+}
 
 @Singleton
 class VideoActionRepository @Inject constructor(
@@ -41,7 +44,18 @@ class VideoActionRepository @Inject constructor(
             )
             json.optInt("code") == 0
         } catch (e: BiliApiException) {
-            if (e.code == 65006) true else throw e
+            if (e.code == 65006) true else {
+                val csrf = authStore.biliJct
+                val json = restClient.postSigned(
+                    url = "${BiliConstants.BASE_URL_API}/x/web-interface/archive/like",
+                    params = commonParams() + buildMap {
+                        put("aid", aid.toString())
+                        put("like", if (liked) "2" else "1")
+                        if (csrf.isNotBlank()) put("csrf", csrf)
+                    }
+                )
+                json.optInt("code") == 0
+            }
         }
     }
 
@@ -77,7 +91,20 @@ class VideoActionRepository @Inject constructor(
             )
             json.optInt("code") == 0
         } catch (e: BiliApiException) {
-            if (e.code == 11201) true else throw e
+            if (e.code == 11201) true else {
+                val csrf = authStore.biliJct
+                val json = restClient.postSigned(
+                    url = "${BiliConstants.BASE_URL_API}/x/v3/fav/resource/deal",
+                    params = commonParams() + buildMap {
+                        put("rid", aid.toString())
+                        put("type", "2")
+                        put("add_media_ids", if (fav) folder.fid.toString() else "")
+                        put("del_media_ids", if (fav) "" else folder.fid.toString())
+                        if (csrf.isNotBlank()) put("csrf", csrf)
+                    }
+                )
+                json.optInt("code") == 0
+            }
         }
     }
 
@@ -101,23 +128,29 @@ class VideoActionRepository @Inject constructor(
         val liked = runCatching {
             restClient.getSigned(
                 url = "${BiliConstants.BASE_URL_API}/x/web-interface/archive/has/like",
-                params = base
+                params = base,
+                profile = BiliRestProfile.APP
             ).optInt("data") == 1
         }.getOrDefault(false)
         val coined = runCatching {
-            val multiply = restClient.getSigned(
+            restClient.getSigned(
                 url = "${BiliConstants.BASE_URL_API}/x/web-interface/archive/coins",
-                params = base
+                params = base,
+                profile = BiliRestProfile.APP
             ).optJSONObject("data")?.optInt("multiply") ?: 0
-            multiply > 0
-        }.getOrDefault(false)
+        }.getOrDefault(0)
         val favorited = runCatching {
             restClient.getSigned(
                 url = "${BiliConstants.BASE_URL_API}/x/v2/fav/video/favoured",
-                params = base
+                params = base,
+                profile = BiliRestProfile.APP
             ).optJSONObject("data")?.optBoolean("favoured") == true
         }.getOrDefault(false)
-        return VideoActionRemoteState(liked = liked, coined = coined, favorited = favorited)
+        return VideoActionRemoteState(
+            liked = liked,
+            coinCount = coined.coerceAtLeast(0),
+            favorited = favorited
+        )
     }
 
     private fun commonParams(): Map<String, String> {

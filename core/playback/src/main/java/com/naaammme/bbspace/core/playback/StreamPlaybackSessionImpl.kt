@@ -29,11 +29,17 @@ import com.naaammme.bbspace.core.model.PlaybackProgress
 import com.naaammme.bbspace.core.model.PlaybackRequest
 import com.naaammme.bbspace.core.model.PlaybackSource
 import com.naaammme.bbspace.core.model.PlaybackStream
+import com.naaammme.bbspace.core.model.QualityOption
+import com.naaammme.bbspace.core.model.StreamLimitInfo
 import com.naaammme.bbspace.core.model.PlayerSessionState
 import com.naaammme.bbspace.core.model.ResolvedVideoIds
 import com.naaammme.bbspace.core.model.StreamPlaybackSessionState
 import com.naaammme.bbspace.core.model.StreamPlaybackTarget
+import com.naaammme.bbspace.core.model.VideoDetail
+import com.naaammme.bbspace.core.model.VideoOwner
 import com.naaammme.bbspace.core.model.VideoPlaybackState
+import com.naaammme.bbspace.core.model.VideoRequestIds
+import com.naaammme.bbspace.core.model.VideoStat
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.core.model.VideoCdnMode
 import com.naaammme.bbspace.core.model.selectPlaybackCdn
@@ -165,7 +171,11 @@ class StreamPlaybackSessionImpl @Inject constructor(
             if (_currentTarget.value is StreamPlaybackTarget.Live) {
                 finishLivePlayback(releasePlayer = false)
             }
-            openVideoInternal(target)
+            if (target is VideoTarget.LiveRecord) {
+                openLiveRecordInternal(target)
+            } else {
+                openVideoInternal(target)
+            }
         }
     }
 
@@ -287,6 +297,174 @@ class StreamPlaybackSessionImpl @Inject constructor(
         if (_liveState.value.playbackSource?.currentQn == quality) return
         runtimeScope.launch {
             openLive(route = route, preferredQuality = quality, reportEntry = false)
+        }
+    }
+
+    // vod: live record
+    private suspend fun openLiveRecordInternal(target: VideoTarget.LiveRecord) {
+        val avid = target.avid?.takeIf { it > 0L }
+        if (avid != null) {
+            val resolved = runCatching {
+                detailRepository.fetchVideoDetail(
+                    ids = VideoRequestIds(aid = avid),
+                    src = target.src
+                )
+            }.getOrNull()
+            if (resolved != null && resolved.ids.cid > 0L) {
+                openVideoInternal(
+                    VideoTarget.Ugc(
+                        aid = avid,
+                        cid = resolved.ids.cid,
+                        bvid = resolved.ids.bvid,
+                        src = target.src
+                    )
+                )
+                return
+            }
+        }
+
+        val currentTarget = (_currentTarget.value as? StreamPlaybackTarget.Video)?.target
+        val currentState = vodSession.value
+        if (currentTarget == target && currentState.error == null && playerEngine.currentSource.value != null) {
+            return
+        }
+
+        val token = openId.incrementAndGet()
+        nextPlayWhenReady = true
+        val detail = VideoDetail(
+            title = target.title,
+            cover = target.cover,
+            owner = VideoOwner(
+                mid = target.uid,
+                name = target.ownerName ?: "UP主",
+                fansText = null,
+                arcCountText = null,
+                face = target.ownerFace
+            ),
+            stat = VideoStat(
+                view = target.viewCount?.toString() ?: "0",
+                danmaku = target.danmakuCount?.toString() ?: "0",
+                reply = "0",
+                like = "0",
+                coin = "0",
+                fav = "0",
+                share = "0"
+            ),
+            pubTs = target.startTimeSec,
+            desc = "直播回放 · 时长 ${formatRecordDuration(target.endTimeSec - target.startTimeSec)}"
+        )
+        val initState = PlayerSessionState(
+            biz = PlayBiz.UGC,
+            ids = ResolvedVideoIds(
+                aid = target.avid ?: 0L,
+                cid = target.cid ?: 0L
+            ),
+            detail = detail,
+            detailLoading = false,
+            isPreparing = true
+        )
+        finishVideoPlayback(
+            invalidateOpen = false,
+            releasePlayer = false,
+            nextTarget = target,
+            nextState = initState,
+            finalizeReportAsync = true
+        )
+
+        try {
+            prepare()
+            val streamOptions = liveRepository.fetchRecordStreams(
+                liveKey = target.liveKey.orEmpty(),
+                startTime = target.startTimeSec,
+                endTime = target.endTimeSec,
+                liveUid = target.uid
+            ).ifEmpty {
+                val downloadUrl = liveRepository.fetchRecordDownloadUrl(
+                    recordId = target.recordId,
+                    liveKey = target.liveKey
+                ) ?: throw NoPlayableStreamException("无法获取录播视频流")
+                listOf(com.naaammme.bbspace.core.live.LiveRecordStream(type = 0, url = downloadUrl))
+            }
+            if (openId.get() != token) return
+
+            val streams = streamOptions.mapIndexed { index, option ->
+                PlaybackStream.Progressive(
+                    quality = index + 1,
+                    format = if (option.type == 0) "mp4" else "hls",
+                    description = if (streamOptions.size == 1) "原画" else "线路 ${option.type}",
+                    width = null,
+                    height = null,
+                    mimeType = if (option.type == 0) "video/mp4" else "application/x-mpegURL",
+                    needVip = false,
+                    needLogin = false,
+                    supportDrm = false,
+                    segments = listOf(
+                        com.naaammme.bbspace.core.model.ProgressiveSegment(option.url, null)
+                    )
+                )
+            }
+            val qualityOptions = streams.map { stream ->
+                QualityOption(
+                    quality = stream.quality,
+                    format = stream.format,
+                    description = stream.description,
+                    displayDescription = stream.description,
+                    needVip = false,
+                    needLogin = false,
+                    vipFree = false,
+                    supportDrm = false,
+                    limit = null
+                )
+            }
+            val audio = PlaybackAudio(
+                id = 0,
+                url = "",
+                backupUrls = emptyList(),
+                bandwidth = 0,
+                codecId = 0,
+                mimeType = null
+            )
+            val firstStream = streams.first()
+            val playbackSource = PlaybackSource(
+                biz = PlayBiz.UGC,
+                durationMs = (target.endTimeSec - target.startTimeSec).coerceAtLeast(0L) * 1000L,
+                streams = streams,
+                audios = listOf(audio),
+                qualityOptions = qualityOptions,
+                resumePositionMs = null,
+                isPreview = false,
+                supportProject = false,
+                supplementType = null
+            )
+            val engineSource = buildVideoEngineSource(
+                stream = firstStream,
+                audio = audio,
+                cdnMode = currentVideoCdnMode,
+                durationMs = playbackSource.durationMs
+            ) ?: throw NoPlayableStreamException("无法获取录播视频流")
+            playerEngine.setSource(
+                source = engineSource,
+                playWhenReady = nextPlayWhenReady
+            )
+            if (openId.get() != token) return
+            vodSession.value = initState.copy(
+                playbackSource = playbackSource,
+                currentStream = firstStream,
+                currentAudio = audio,
+                isPreparing = false,
+                error = null
+            )
+            refreshVideoState()
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            if (openId.get() != token) return
+            Logger.e(TAG, t) { "load live record failed recordId=${target.recordId} msg=${t.message}" }
+            vodSession.value = initState.copy(
+                isPreparing = false,
+                playbackSource = null,
+                error = PlaybackError.NoPlayableStream(t.message ?: "无法获取录播视频流")
+            )
+            refreshVideoState()
         }
     }
 
@@ -615,11 +793,16 @@ class StreamPlaybackSessionImpl @Inject constructor(
             }
 
             is PlaybackStream.Progressive -> {
-                EngineSource.Progressive(
-                    segments = stream.segments.map {
-                        EngineSource.ProgressiveSegment(it.url, it.durationMs)
-                    }
-                )
+                val isHls = stream.mimeType?.contains("mpegurl", ignoreCase = true) == true
+                if (isHls && stream.segments.size == 1) {
+                    EngineSource.Hls(stream.segments.first().url)
+                } else {
+                    EngineSource.Progressive(
+                        segments = stream.segments.map {
+                            EngineSource.ProgressiveSegment(it.url, it.durationMs)
+                        }
+                    )
+                }
             }
 
             null -> null
@@ -881,6 +1064,18 @@ class StreamPlaybackSessionImpl @Inject constructor(
         return when (this) {
             is IllegalStateException -> LivePlaybackError.NoPlayableStream(msg)
             else -> LivePlaybackError.RequestFailed(msg, this)
+        }
+    }
+
+    private fun formatRecordDuration(seconds: Long): String {
+        val safe = seconds.coerceAtLeast(0L)
+        val m = safe / 60
+        val s = safe % 60
+        val h = m / 60
+        return if (h > 0) {
+            String.format(java.util.Locale.ROOT, "%d:%02d:%02d", h, m % 60, s)
+        } else {
+            String.format(java.util.Locale.ROOT, "%d:%02d", m, s)
         }
     }
 

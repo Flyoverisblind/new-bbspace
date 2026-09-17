@@ -27,6 +27,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -86,7 +87,7 @@ internal fun VideoDetailPage(
     detailError: String?,
     actionState: VideoActionUiState,
     onLike: () -> Unit,
-    onCoin: () -> Unit,
+    onCoin: (Int) -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
     playQueue: VideoPlayQueue?,
@@ -244,7 +245,7 @@ private fun DetailPageContent(
     detailError: String?,
     actionState: VideoActionUiState,
     onLike: () -> Unit,
-    onCoin: () -> Unit,
+    onCoin: (Int) -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
     playQueue: VideoPlayQueue?,
@@ -315,7 +316,7 @@ private fun LazyListScope.detailItems(
     detailError: String?,
     actionState: VideoActionUiState,
     onLike: () -> Unit,
-    onCoin: () -> Unit,
+    onCoin: (Int) -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
     playQueue: VideoPlayQueue?,
@@ -484,7 +485,7 @@ private fun VideoSummarySection(
     onOpenComments: () -> Unit,
     actionState: VideoActionUiState,
     onLike: () -> Unit,
-    onCoin: () -> Unit,
+    onCoin: (Int) -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit
 ) {
@@ -666,12 +667,39 @@ private fun ActionCapsule(
     stat: VideoStat?,
     actionState: VideoActionUiState,
     onLike: () -> Unit,
-    onCoin: () -> Unit,
+    onCoin: (Int) -> Unit,
     onFavorite: () -> Unit,
     onTriple: () -> Unit,
     modifier: Modifier = Modifier,
     onDownloadClick: () -> Unit
 ) {
+    var showCoinDialog by remember { mutableStateOf(false) }
+    if (showCoinDialog) {
+        AlertDialog(
+            onDismissRequest = { showCoinDialog = false },
+            title = { Text("选择投币数量") },
+            text = { Text(if (actionState.coinCount > 0) "当前已投 ${actionState.coinCount} 币，最多可投 2 币" else "请选择投币数量") },
+            dismissButton = {
+                TextButton(onClick = { showCoinDialog = false }) { Text("取消") }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            showCoinDialog = false
+                            onCoin(1)
+                        }
+                    ) { Text("投 1 币") }
+                    TextButton(
+                        onClick = {
+                            showCoinDialog = false
+                            onCoin(2)
+                        }
+                    ) { Text("投 2 币") }
+                }
+            }
+        )
+    }
     CapsuleCard(modifier = modifier) {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -681,19 +709,19 @@ private fun ActionCapsule(
             stat?.let {
                 ActionChip(
                     label = if (actionState.isLiked) "已赞" else "点赞",
-                    value = it.like,
+                    value = adjustCount(it.like, actionState.likeDelta),
                     selected = actionState.isLiked,
                     onClick = onLike
                 )
                 ActionChip(
                     label = if (actionState.isCoined) "已投币" else "投币",
-                    value = it.coin,
+                    value = adjustCount(it.coin, actionState.coinDelta),
                     selected = actionState.isCoined,
-                    onClick = onCoin
+                    onClick = { showCoinDialog = true }
                 )
                 ActionChip(
                     label = if (actionState.isFavorited) "已收藏" else "收藏",
-                    value = it.fav,
+                    value = adjustCount(it.fav, actionState.favDelta),
                     selected = actionState.isFavorited,
                     onClick = onFavorite
                 )
@@ -799,6 +827,13 @@ private fun ToggleChip(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }
+}
+
+private fun adjustCount(value: String?, delta: Int): String? {
+    value ?: return null
+    if (delta == 0) return value
+    val base = value.toLongOrNull() ?: return value
+    return (base + delta).coerceAtLeast(0L).toString()
 }
 
 @Composable
@@ -929,11 +964,11 @@ private fun FavoriteQueueEntryCard(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "收藏夹列表",
+                text = queue.title,
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = current?.title ?: "收藏夹",
+                text = current?.title ?: queue.title,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis

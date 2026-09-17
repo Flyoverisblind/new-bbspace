@@ -12,7 +12,6 @@ import com.naaammme.bbspace.core.model.SpaceRoute
 import com.naaammme.bbspace.core.model.SpaceRouteTool
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.feature.space.SpaceScreen
-import com.naaammme.bbspace.feature.space.record.LiveRecordPlayerScreen
 
 const val SPACE_MID_ARG = "mid"
 const val SPACE_NAME_ARG = "name"
@@ -39,7 +38,7 @@ fun NavGraphBuilder.spaceScreen(
     onOpenVideo: (VideoTarget) -> Unit,
     onOpenDynamic: (String) -> Unit = {},
     onOpenLive: (LiveRoute) -> Unit = {},
-    onOpenLiveRecord: (LiveRecordItem) -> Unit = {},
+    onOpenLiveRecord: (List<LiveRecordItem>, Int) -> Unit = { _, _ -> },
     onOpenIm: ((Long, String, String?) -> Unit)? = null,
     onOpenRelation: (Long, Int) -> Unit = { _, _ -> }
 ) {
@@ -73,25 +72,6 @@ fun NavGraphBuilder.spaceScreen(
             onOpenIm = onOpenIm,
             onOpenRelation = onOpenRelation
         )
-    }
-}
-
-private const val LIVE_RECORD_UID_ARG = "uid"
-private const val LIVE_RECORD_ID_ARG = "recordId"
-
-fun NavController.navigateToLiveRecordPlayer(uid: Long, recordId: Long) {
-    navigate("live_record_player/$uid/$recordId")
-}
-
-fun NavGraphBuilder.liveRecordPlayerScreen(onBack: () -> Unit) {
-    composable(
-        route = "live_record_player/{$LIVE_RECORD_UID_ARG}/{$LIVE_RECORD_ID_ARG}",
-        arguments = listOf(
-            navArgument(LIVE_RECORD_UID_ARG) { type = NavType.LongType; defaultValue = 0L },
-            navArgument(LIVE_RECORD_ID_ARG) { type = NavType.LongType; defaultValue = 0L }
-        )
-    ) {
-        LiveRecordPlayerScreen(onBack = onBack)
     }
 }
 

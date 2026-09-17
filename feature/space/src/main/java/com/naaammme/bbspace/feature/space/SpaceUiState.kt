@@ -5,6 +5,7 @@ import com.naaammme.bbspace.core.model.DynamicItem
 import com.naaammme.bbspace.core.model.LiveRecordItem
 import com.naaammme.bbspace.core.model.SpaceOrderOption
 import com.naaammme.bbspace.core.model.SpaceProfile
+import com.naaammme.bbspace.core.model.SpaceTab2Item
 import com.naaammme.bbspace.core.model.SpaceVideo
 
 internal const val SPACE_DEFAULT_ORDER = "pubdate"
@@ -20,6 +21,11 @@ data class SpaceUiState(
     val archive: SpaceArchiveUiState = SpaceArchiveUiState(),
     val dynamics: SpaceDynamicUiState = SpaceDynamicUiState(),
     val liveRecords: SpaceLiveRecordUiState = SpaceLiveRecordUiState(),
+    val contributeTabs: List<SpaceTab2Item> = emptyList(),
+    val selectedContributeIndex: Int = 0,
+    val contributeVideos: List<SpaceVideo> = emptyList(),
+    val contributeLoading: Boolean = false,
+    val contributeMessage: String? = null,
     val selectedSection: SpaceSection = SpaceSection.VIDEO
 ) {
     val title: String
@@ -92,6 +98,7 @@ data class SpaceDynamicUiState(
 data class SpaceLiveRecordUiState(
     val items: List<LiveRecordItem> = emptyList(),
     val page: Int = 0,
+    val cursorAid: Long? = null,
     val hasMore: Boolean = false,
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,

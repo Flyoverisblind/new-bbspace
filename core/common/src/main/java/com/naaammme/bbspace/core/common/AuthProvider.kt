@@ -7,4 +7,6 @@ package com.naaammme.bbspace.core.common
 interface AuthProvider {
     val mid: Long
     val accessToken: String
+    val cookieHeader: String
+    val csrfToken: String
 }
