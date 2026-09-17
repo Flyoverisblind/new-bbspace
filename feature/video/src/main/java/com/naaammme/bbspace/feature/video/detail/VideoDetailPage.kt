@@ -72,6 +72,7 @@ import com.naaammme.bbspace.core.model.VideoSeason
 import com.naaammme.bbspace.core.model.VideoSeasonEpisode
 import com.naaammme.bbspace.core.model.VideoStat
 import com.naaammme.bbspace.feature.comment.CommentPanel
+import com.naaammme.bbspace.feature.video.VideoActionUiState
 import com.naaammme.bbspace.feature.video.formatDuration
 import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -82,6 +83,11 @@ internal fun VideoDetailPage(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
+    onFavorite: () -> Unit,
+    onTriple: () -> Unit,
     commentSubject: CommentSubject?,
     contentHorizontalPad: Dp,
     onOpenVideo: (VideoTarget) -> Unit,
@@ -128,6 +134,11 @@ internal fun VideoDetailPage(
                 ids = ids,
                 detailLoading = detailLoading,
                 detailError = detailError,
+                actionState = actionState,
+                onLike = onLike,
+                onCoin = onCoin,
+                onFavorite = onFavorite,
+                onTriple = onTriple,
                 horizontalPad = contentHorizontalPad,
                 infoListState = detailListState,
                 descOn = descOn,
@@ -212,6 +223,11 @@ private fun DetailPageContent(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
+    onFavorite: () -> Unit,
+    onTriple: () -> Unit,
     horizontalPad: Dp,
     infoListState: LazyListState,
     descOn: Boolean,
@@ -245,6 +261,11 @@ private fun DetailPageContent(
             ids = ids,
             detailLoading = detailLoading,
             detailError = detailError,
+            actionState = actionState,
+            onLike = onLike,
+            onCoin = onCoin,
+            onFavorite = onFavorite,
+            onTriple = onTriple,
             itemMod = itemMod,
             descOn = descOn,
             tagOn = tagOn,
@@ -267,6 +288,11 @@ private fun LazyListScope.detailItems(
     ids: ResolvedVideoIds,
     detailLoading: Boolean,
     detailError: String?,
+    actionState: VideoActionUiState,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
+    onFavorite: () -> Unit,
+    onTriple: () -> Unit,
     itemMod: Modifier,
     descOn: Boolean,
     tagOn: Boolean,
@@ -327,6 +353,11 @@ private fun LazyListScope.detailItems(
                     onOpenSpace = onOpenSpace,
                     onDownloadClick = onDownloadClick,
                     onOpenComments = onOpenComments,
+                    actionState = actionState,
+                    onLike = onLike,
+                    onCoin = onCoin,
+                    onFavorite = onFavorite,
+                    onTriple = onTriple,
                     modifier = itemMod
                 )
             }
@@ -409,7 +440,12 @@ private fun VideoSummarySection(
     onToggleTag: () -> Unit,
     onOpenSpace: (SpaceRoute) -> Unit,
     onDownloadClick: () -> Unit,
-    onOpenComments: () -> Unit
+    onOpenComments: () -> Unit,
+    actionState: VideoActionUiState,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
+    onFavorite: () -> Unit,
+    onTriple: () -> Unit
 ) {
     val spaceRoute = detail.toSpaceRouteOrNull(ids.aid.takeIf { it > 0L })
     Column(
@@ -435,6 +471,11 @@ private fun VideoSummarySection(
         )
         ActionCapsule(
             stat = detail.stat,
+            actionState = actionState,
+            onLike = onLike,
+            onCoin = onCoin,
+            onFavorite = onFavorite,
+            onTriple = onTriple,
             onDownloadClick = onDownloadClick
         )
     }
@@ -582,6 +623,11 @@ private fun InfoCapsule(
 @Composable
 private fun ActionCapsule(
     stat: VideoStat?,
+    actionState: VideoActionUiState,
+    onLike: () -> Unit,
+    onCoin: () -> Unit,
+    onFavorite: () -> Unit,
+    onTriple: () -> Unit,
     modifier: Modifier = Modifier,
     onDownloadClick: () -> Unit
 ) {
@@ -592,14 +638,38 @@ private fun ActionCapsule(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             stat?.let {
-                ActionChip("点赞", it.like)
-                ActionChip("投币", it.coin)
-                ActionChip("收藏", it.fav)
-                ActionChip("分享", it.share)
+                ActionChip(
+                    label = if (actionState.isLiked) "已赞" else "点赞",
+                    value = it.like,
+                    onClick = onLike
+                )
+                ActionChip(
+                    label = if (actionState.isCoined) "已投币" else "投币",
+                    value = it.coin,
+                    onClick = onCoin
+                )
+                ActionChip(
+                    label = if (actionState.isFavorited) "已收藏" else "收藏",
+                    value = it.fav,
+                    onClick = onFavorite
+                )
+                ActionChip(
+                    label = "一键三连",
+                    onClick = onTriple
+                )
+                ActionChip(label = "分享", value = it.share)
             }
             ActionChip(
                 label = "下载",
                 onClick = onDownloadClick
+            )
+        }
+        actionState.message?.takeIf(String::isNotBlank)?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
     }

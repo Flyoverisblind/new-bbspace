@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.naaammme.bbspace.core.settings.AppSettings
+import com.naaammme.bbspace.core.playback.VideoActionRepository
 import com.naaammme.bbspace.core.playback.VideoOnlineRepository
 import com.naaammme.bbspace.core.playback.VideoPlaybackController
 import com.naaammme.bbspace.core.model.CommentSubject
@@ -22,6 +23,7 @@ import com.naaammme.bbspace.core.model.VideoDownloadKind
 import com.naaammme.bbspace.core.model.VideoDownloadMeta
 import com.naaammme.bbspace.core.model.VideoDownloadRequest
 import com.naaammme.bbspace.core.model.VideoPlaybackState
+import com.naaammme.bbspace.core.model.VideoQueueItem
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.core.model.isSameEntry
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,15 +34,24 @@ import kotlinx.coroutines.launch
 
 data class VideoPlayQueue(
     val title: String,
-    val items: List<VideoTarget>,
+    val items: List<VideoQueueItem>,
     val currentIndex: Int
+)
+
+data class VideoActionUiState(
+    val isLiked: Boolean = false,
+    val isCoined: Boolean = false,
+    val isFavorited: Boolean = false,
+    val isWorking: Boolean = false,
+    val message: String? = null
 )
 
 @HiltViewModel
 class VideoViewModel @Inject constructor(
     private val playbackController: VideoPlaybackController,
     private val playerSettings: AppSettings,
-    private val onlineRepository: VideoOnlineRepository
+    private val onlineRepository: VideoOnlineRepository,
+    private val actionRepository: VideoActionRepository
 ) : ViewModel() {
 
     private val _targetStack = MutableStateFlow<List<VideoTarget>>(emptyList())
@@ -49,10 +60,12 @@ class VideoViewModel @Inject constructor(
     private var playbackPrefs = PlayerPlaybackPrefs()
     private var endedHandled = false
     private val _playQueueState = MutableStateFlow<VideoPlayQueue?>(null)
+    private val _actionState = MutableStateFlow(VideoActionUiState())
     private val _onlineCount = MutableStateFlow(0L)
     private var onlineKey: Pair<Long, Long>? = null
 
     val playQueueState: StateFlow<VideoPlayQueue?> = _playQueueState
+    val actionState: StateFlow<VideoActionUiState> = _actionState
     val onlineCount: StateFlow<Long> = _onlineCount
 
     val player: StateFlow<Player?> = playbackController.player
@@ -77,9 +90,19 @@ class VideoViewModel @Inject constructor(
                             bvid = ids.bvid
                         )
                     }.onSuccess { _onlineCount.value = it }
+                    runCatching {
+                        actionRepository.fetchActionState(ids.aid)
+                    }.onSuccess { action ->
+                        _actionState.value = _actionState.value.copy(
+                            isLiked = action.liked,
+                            isCoined = action.coined,
+                            isFavorited = action.favorited
+                        )
+                    }
                 } else if (ids.aid <= 0L || ids.cid <= 0L) {
                     onlineKey = null
                     _onlineCount.value = 0L
+                    _actionState.value = VideoActionUiState()
                 }
             }
         }
@@ -117,18 +140,18 @@ class VideoViewModel @Inject constructor(
 
     fun openPlaylist(
         title: String,
-        targets: List<VideoTarget>,
+        items: List<VideoQueueItem>,
         startIndex: Int = 0
     ) {
-        if (targets.isEmpty()) return
-        val index = startIndex.coerceIn(0, targets.lastIndex)
-        val target = targets[index]
+        if (items.isEmpty()) return
+        val index = startIndex.coerceIn(0, items.lastIndex)
+        val target = items[index].target
         _targetStack.value = listOf(target)
-        playQueue = targets
+        playQueue = items.map { it.target }
         playQueueIndex = index
         _playQueueState.value = VideoPlayQueue(
             title = title,
-            items = targets,
+            items = items,
             currentIndex = index
         )
         playbackController.openVideo(target)
@@ -182,6 +205,93 @@ class VideoViewModel @Inject constructor(
     fun updatePlaybackEndAction(action: PlaybackEndAction) {
         viewModelScope.launch {
             playerSettings.setPlaybackEndAction(action)
+        }
+    }
+
+    fun likeVideo() {
+        val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        viewModelScope.launch {
+            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
+            runCatching {
+                actionRepository.like(aid, liked = _actionState.value.isLiked)
+            }.onSuccess { ok ->
+                _actionState.value = _actionState.value.copy(
+                    isLiked = if (ok) !_actionState.value.isLiked else _actionState.value.isLiked,
+                    isWorking = false,
+                    message = if (ok) null else "点赞失败"
+                )
+            }.onFailure { error ->
+                _actionState.value = _actionState.value.copy(
+                    isWorking = false,
+                    message = error.message ?: "点赞失败"
+                )
+            }
+        }
+    }
+
+    fun coinVideo() {
+        val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        viewModelScope.launch {
+            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
+            runCatching {
+                actionRepository.coin(aid, multiply = 2, selectLike = true)
+            }.onSuccess { ok ->
+                _actionState.value = _actionState.value.copy(
+                    isCoined = if (ok) true else _actionState.value.isCoined,
+                    isLiked = if (ok) true else _actionState.value.isLiked,
+                    isWorking = false,
+                    message = if (ok) null else "投币失败"
+                )
+            }.onFailure { error ->
+                _actionState.value = _actionState.value.copy(
+                    isWorking = false,
+                    message = error.message ?: "投币失败"
+                )
+            }
+        }
+    }
+
+    fun favoriteVideo() {
+        val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        viewModelScope.launch {
+            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
+            runCatching {
+                actionRepository.favorite(aid, fav = !_actionState.value.isFavorited)
+            }.onSuccess { ok ->
+                _actionState.value = _actionState.value.copy(
+                    isFavorited = if (ok) !_actionState.value.isFavorited else _actionState.value.isFavorited,
+                    isWorking = false,
+                    message = if (ok) null else "收藏失败"
+                )
+            }.onFailure { error ->
+                _actionState.value = _actionState.value.copy(
+                    isWorking = false,
+                    message = error.message ?: "收藏失败"
+                )
+            }
+        }
+    }
+
+    fun tripleVideo() {
+        val aid = videoState.value.ids.aid.takeIf { it > 0L } ?: return
+        viewModelScope.launch {
+            _actionState.value = _actionState.value.copy(isWorking = true, message = null)
+            runCatching {
+                actionRepository.triple(aid)
+            }.onSuccess { result ->
+                _actionState.value = _actionState.value.copy(
+                    isLiked = result.like,
+                    isCoined = result.coin,
+                    isFavorited = result.fav,
+                    isWorking = false,
+                    message = if (result.like && result.coin && result.fav) "一键三连成功" else "一键三连完成"
+                )
+            }.onFailure { error ->
+                _actionState.value = _actionState.value.copy(
+                    isWorking = false,
+                    message = error.message ?: "一键三连失败"
+                )
+            }
         }
     }
 
@@ -274,8 +384,8 @@ class VideoViewModel @Inject constructor(
     fun switchPlayQueueItem(index: Int) {
         val queue = _playQueueState.value ?: return
         if (index !in queue.items.indices) return
-        val target = queue.items[index]
-        playQueue = queue.items
+        val target = queue.items[index].target
+        playQueue = queue.items.map { it.target }
         playQueueIndex = index
         _playQueueState.value = queue.copy(currentIndex = index)
         _targetStack.value = listOf(target)

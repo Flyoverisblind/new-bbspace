@@ -20,6 +20,7 @@ import com.naaammme.bbspace.core.designsystem.component.BiliPullToRefreshBox
 import com.naaammme.bbspace.core.designsystem.component.CollapsingTopBarScaffold
 import com.naaammme.bbspace.core.designsystem.component.StateMessageCard
 import com.naaammme.bbspace.core.model.FavoriteContentTarget
+import com.naaammme.bbspace.core.model.VideoQueueItem
 import com.naaammme.bbspace.core.model.VideoTarget
 import com.naaammme.bbspace.feature.favorite.FavoriteLoading
 import com.naaammme.bbspace.feature.favorite.item.FavoriteContentList
@@ -30,14 +31,22 @@ fun FavoriteFolderDetailScreen(
     onBack: () -> Unit,
     fid: Long,
     onOpenContent: (FavoriteContentTarget) -> Unit,
-    onPlayAll: (List<VideoTarget>) -> Unit = {},
-    onOpenVideoWithQueue: (List<VideoTarget>, Int) -> Unit = { _, _ -> },
+    onPlayAll: (List<VideoQueueItem>) -> Unit = {},
+    onOpenVideoWithQueue: (List<VideoQueueItem>, Int) -> Unit = { _, _ -> },
     viewModel: FavoriteFolderDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val playableVideos = state.items.mapNotNull { item ->
-        (item.target as? FavoriteContentTarget.Video)?.target
+    val playableItems = state.items.mapNotNull { item ->
+        (item.target as? FavoriteContentTarget.Video)?.let { video ->
+            VideoQueueItem(
+                target = video.target,
+                title = item.title,
+                cover = item.cover,
+                ownerName = item.ownerName,
+                durationText = item.playbackDesc
+            )
+        }
     }
 
     CollapsingTopBarScaffold(
@@ -62,8 +71,8 @@ fun FavoriteFolderDetailScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { onPlayAll(playableVideos) },
-                        enabled = playableVideos.isNotEmpty()
+                        onClick = { onPlayAll(playableItems) },
+                        enabled = playableItems.isNotEmpty()
                     ) {
                         Icon(
                             imageVector = Icons.Filled.PlayArrow,
@@ -116,9 +125,9 @@ fun FavoriteFolderDetailScreen(
                         onOpenContent = { target ->
                             when (target) {
                                 is FavoriteContentTarget.Video -> {
-                                    val index = playableVideos.indexOfFirst { it == target.target }
+                                    val index = playableItems.indexOfFirst { it.target == target.target }
                                     if (index >= 0) {
-                                        onOpenVideoWithQueue(playableVideos, index)
+                                        onOpenVideoWithQueue(playableItems, index)
                                     } else {
                                         onOpenContent(target)
                                     }

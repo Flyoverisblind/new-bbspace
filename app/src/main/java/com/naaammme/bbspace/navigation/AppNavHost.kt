@@ -3,6 +3,7 @@ package com.naaammme.bbspace.navigation
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -62,6 +64,7 @@ import com.naaammme.bbspace.core.model.SpaceRoute
 import com.naaammme.bbspace.core.model.StreamPlaybackTarget
 import androidx.compose.runtime.CompositionLocalProvider
 import com.naaammme.bbspace.core.model.VideoSrc
+import com.naaammme.bbspace.core.model.VideoQueueItem
 import com.naaammme.bbspace.core.model.VideoTarget
 
 import com.naaammme.bbspace.core.model.VideoTargetTool
@@ -191,12 +194,12 @@ fun AppNavHost(
         playbackHostViewModel.expand()
         videoViewModel.openRoot(target)
     }
-    val openVideoPlaylist: (List<VideoTarget>, Int) -> Unit = { targets, startIndex ->
-        if (targets.isNotEmpty()) {
+    val openVideoPlaylist: (List<VideoQueueItem>, Int) -> Unit = { items, startIndex ->
+        if (items.isNotEmpty()) {
             playbackHostViewModel.expand()
             videoViewModel.openPlaylist(
                 title = "收藏夹",
-                targets = targets,
+                items = items,
                 startIndex = startIndex
             )
         }
@@ -622,8 +625,25 @@ private fun TopLevelFloatingNavigation(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(toolbarShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.76f))
-                    .blur(20.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.42f),
+                                Color.White.copy(alpha = 0.12f)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 0.8.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.70f),
+                                Color.White.copy(alpha = 0.14f)
+                            )
+                        ),
+                        shape = toolbarShape
+                    )
+                    .blur(18.dp)
             )
             Surface(
                 shape = toolbarShape,

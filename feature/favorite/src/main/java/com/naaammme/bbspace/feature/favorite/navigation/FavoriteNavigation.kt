@@ -5,7 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.naaammme.bbspace.core.model.FavoriteContentTarget
-import com.naaammme.bbspace.core.model.VideoTarget
+import com.naaammme.bbspace.core.model.VideoQueueItem
 import com.naaammme.bbspace.feature.favorite.FavoriteScreen
 import com.naaammme.bbspace.feature.favorite.folderdetail.FavoriteFolderDetailScreen
 
@@ -25,8 +25,8 @@ fun NavGraphBuilder.favoriteScreen(
     onBack: () -> Unit,
     onOpenContent: (FavoriteContentTarget) -> Unit,
     onOpenFolder: (Long) -> Unit,
-    onPlayAll: (List<VideoTarget>) -> Unit = {},
-    onOpenVideoWithQueue: (List<VideoTarget>, Int) -> Unit = { _, _ -> }
+    onPlayAll: (List<VideoQueueItem>) -> Unit = {},
+    onOpenVideoWithQueue: (List<VideoQueueItem>, Int) -> Unit = { _, _ -> }
 ) {
     composable(FAVORITE_ROUTE) {
         FavoriteScreen(

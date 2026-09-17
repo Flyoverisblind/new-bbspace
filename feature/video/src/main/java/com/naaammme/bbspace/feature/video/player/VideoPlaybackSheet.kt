@@ -1,5 +1,6 @@
 package com.naaammme.bbspace.feature.video.player
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
@@ -12,7 +13,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -43,11 +46,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.naaammme.bbspace.core.designsystem.component.CoverImage
 import com.naaammme.bbspace.core.designsystem.component.DanmakuSettingsSection
 import com.naaammme.bbspace.core.model.PlaybackEndAction
 import com.naaammme.bbspace.core.model.PlaybackError
@@ -198,15 +203,10 @@ internal fun VideoQueueSheet(
             }
             items(
                 items = queue.items,
-                key = { "queue_${it.hashCode()}" }
+                key = { item -> "queue_${item.target.hashCode()}" }
             ) { item ->
                 val index = queue.items.indexOf(item)
                 val selected = index == queue.currentIndex
-                val title = when (item) {
-                    is com.naaammme.bbspace.core.model.VideoTarget.Ugc -> "AV${item.aid} / CID ${item.cid}"
-                    is com.naaammme.bbspace.core.model.VideoTarget.Pgc -> item.epId.takeIf { it > 0L }?.let { "EP$it" } ?: "选集"
-                    is com.naaammme.bbspace.core.model.VideoTarget.Pugv -> item.epId.takeIf { it > 0L }?.let { "EP$it" } ?: "选集"
-                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -214,15 +214,52 @@ internal fun VideoQueueSheet(
                             viewModel.switchPlayQueueItem(index)
                             onDismiss()
                         }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "${index + 1}. $title",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .width(104.dp)
+                            .height(64.dp)
+                    ) {
+                        CoverImage(
+                            url = item.cover,
+                            contentDescription = item.title,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        item.durationText?.let { duration ->
+                            Text(
+                                text = duration,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .background(
+                                        Color.Black.copy(alpha = 0.56f),
+                                        MaterialTheme.shapes.extraSmall
+                                    )
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 2
+                        )
+                        item.ownerName?.takeIf(String::isNotBlank)?.let { owner ->
+                            Text(
+                                text = owner,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     if (selected) {
                         Text(
                             text = "当前播放",

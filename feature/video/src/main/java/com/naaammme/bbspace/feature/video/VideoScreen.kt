@@ -77,6 +77,7 @@ fun VideoScreen(
     hostExpanded: Boolean = true
 ) {
     val videoState by viewModel.videoState.collectAsStateWithLifecycle()
+    val actionState by viewModel.actionState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle(initialValue = PlayerSettingsState())
     val act = LocalActivity.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -217,6 +218,11 @@ fun VideoScreen(
                         ids = videoState.ids,
                         detailLoading = videoState.detailLoading,
                         detailError = videoState.detailError,
+                        actionState = actionState,
+                        onLike = viewModel::likeVideo,
+                        onCoin = viewModel::coinVideo,
+                        onFavorite = viewModel::favoriteVideo,
+                        onTriple = viewModel::tripleVideo,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 0.dp,
                         onOpenVideo = openTarget,
@@ -257,6 +263,11 @@ fun VideoScreen(
                         ids = videoState.ids,
                         detailLoading = videoState.detailLoading,
                         detailError = videoState.detailError,
+                        actionState = actionState,
+                        onLike = viewModel::likeVideo,
+                        onCoin = viewModel::coinVideo,
+                        onFavorite = viewModel::favoriteVideo,
+                        onTriple = viewModel::tripleVideo,
                         commentSubject = viewModel.commentSubject,
                         contentHorizontalPad = 16.dp,
                         onOpenVideo = openTarget,

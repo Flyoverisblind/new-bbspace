@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:history"))
     implementation(project(":core:live"))
     implementation(project(":core:video"))
+    implementation(project(":core:favorite"))
     implementation(project(":infra:crypto"))
     implementation(project(":infra:network-http"))
     implementation(project(":infra:player"))
